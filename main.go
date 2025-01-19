@@ -93,37 +93,43 @@ func main() {
 		file.Read(eventData)
 
 		// Read LDCs
-		ldcCount := 0
 		position := 0
 		for {
-			var ldcHeader EventHeaderStruct
-			ldcHeaderBinary := eventData[position : position+int(headerSize)]
-			ldcHeaderReader := bytes.NewReader(ldcHeaderBinary)
-			binary.Read(ldcHeaderReader, binary.LittleEndian, &ldcHeader)
-			fmt.Printf("\tLDC count: %d, evt id: %d. GDC %d, LDC %d\n", ldcCount, ldcHeader.EventId, ldcHeader.EventGdcId, ldcHeader.EventLdcId)
-			fmt.Println("\tHeader:", ldcHeader)
-			fmt.Println("\tSuperevent:", ldcHeader.EventTypeAttribute[0]&SUPER_EVENT)
-
-			// Read equipment header
-			startLDCPayload := position + int(ldcHeader.EventHeadSize)
-			startPosition := 0
-			for {
-				nRead := readEquipment(eventData[startLDCPayload:], startPosition)
-				// Next equipment
-				startPosition += nRead
-				if startPosition+int(ldcHeader.EventHeadSize) >= int(ldcHeader.EventSize) {
-					break
-				}
-			}
-
+			nRead := readLDC(eventData, position)
 			// Next LDC
-			position += int(ldcHeader.EventSize)
+			position += nRead
 			fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
 			if position >= len(eventData) {
 				break
 			}
 		}
 	}
+}
+
+func readLDC(eventData []byte, position int) int {
+	var header EventHeaderStruct
+	headerSize := unsafe.Sizeof(header)
+	fmt.Println("LDC header size:", headerSize)
+	ldcHeaderBinary := eventData[position : position+int(headerSize)]
+	ldcHeaderReader := bytes.NewReader(ldcHeaderBinary)
+	binary.Read(ldcHeaderReader, binary.LittleEndian, &header)
+	fmt.Printf("\tEvt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
+	fmt.Println("\tHeader:", header)
+	fmt.Println("\tSuperevent:", header.EventTypeAttribute[0]&SUPER_EVENT)
+
+	// Read equipment header
+	startLDCPayload := position + int(header.EventHeadSize)
+	startPosition := 0
+	for {
+		nRead := readEquipment(eventData[startLDCPayload:], startPosition)
+		// Next equipment
+		startPosition += nRead
+		if startPosition+int(header.EventHeadSize) >= int(header.EventSize) {
+			break
+		}
+	}
+
+	return int(header.EventSize)
 }
 
 func flipWords(data []byte) []uint16 {
