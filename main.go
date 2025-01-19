@@ -8,6 +8,54 @@ import (
 	"unsafe"
 )
 
+func readEquipment(eventData []byte, position int) int {
+	var eqHeader EquipmentHeaderStruct
+	eqHeaderSize := unsafe.Sizeof(eqHeader)
+	fmt.Println("Equipment Header size:", eqHeaderSize)
+
+	fmt.Println("\t\tPosition:", position)
+
+	eqHeaderBinary := eventData[position : position+int(eqHeaderSize)]
+	eqHeaderReader := bytes.NewReader(eqHeaderBinary)
+	binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
+	fmt.Printf("\t\tEq id: %d. eq type %d\n", eqHeader.EquipmentId, eqHeader.EquipmentType)
+	fmt.Println("\t\tHeader:", eqHeader)
+	fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", position)
+
+	start := position + int(eqHeaderSize)
+	end := position + int(eqHeader.EquipmentSize)
+	payload := flipWords(eventData[start:end])
+
+	fmt.Printf("\t\t payload: ")
+	for i := 0; i < 20; i++ {
+		fmt.Printf(" %x", payload[i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("\t\t originl: ")
+	for i := 0; i < 20; i++ {
+		fmt.Printf(" %x", eventData[start+i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("\t\t end payload: ")
+	for i := len(payload) - 20; i < len(payload); i++ {
+		fmt.Printf(" %x", payload[i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("\t\t end originl: ")
+	for i := end - 20; i < end; i++ {
+		fmt.Printf(" %x", eventData[i])
+	}
+	fmt.Printf("\n")
+
+	ReadCommonHeader(payload)
+
+	nRead := int(eqHeader.EquipmentSize)
+	return nRead
+}
+
 func main() {
 	println("Hello, World!")
 
@@ -21,10 +69,6 @@ func main() {
 	var evtHeader EventHeaderStruct
 	headerSize := unsafe.Sizeof(evtHeader)
 	fmt.Println("Header size:", headerSize)
-
-	var eqHeader EquipmentHeaderStruct
-	eqHeaderSize := unsafe.Sizeof(eqHeader)
-	fmt.Println("Equipment Header size:", eqHeaderSize)
 
 	evtCount := 1
 	for {
@@ -61,49 +105,13 @@ func main() {
 			fmt.Println("\tSuperevent:", ldcHeader.EventTypeAttribute[0]&SUPER_EVENT)
 
 			// Read equipment header
-			equipmentCount := 0
-			eqPosition := position + int(ldcHeader.EventHeadSize)
+			startLDCPayload := position + int(ldcHeader.EventHeadSize)
+			startPosition := 0
 			for {
-				eqHeaderBinary := eventData[eqPosition : eqPosition+int(eqHeaderSize)]
-				eqHeaderReader := bytes.NewReader(eqHeaderBinary)
-				binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
-				fmt.Printf("\t\tEquipment count: %d, eq id: %d. eq type %d\n", equipmentCount, eqHeader.EquipmentId, eqHeader.EquipmentType)
-				fmt.Println("\t\tHeader:", eqHeader)
-				fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", eqPosition, eqPosition-position, ldcHeader.EventSize)
-
-				start := eqPosition + int(eqHeaderSize)
-				end := eqPosition + int(eqHeader.EquipmentSize)
-				payload := flipWords(eventData[start:end])
-
-				fmt.Printf("\t\t payload: ")
-				for i := 0; i < 20; i++ {
-					fmt.Printf(" %x", payload[i])
-				}
-				fmt.Printf("\n")
-
-				fmt.Printf("\t\t originl: ")
-				for i := 0; i < 20; i++ {
-					fmt.Printf(" %x", eventData[start+i])
-				}
-				fmt.Printf("\n")
-
-				fmt.Printf("\t\t end payload: ")
-				for i := len(payload) - 20; i < len(payload); i++ {
-					fmt.Printf(" %x", payload[i])
-				}
-				fmt.Printf("\n")
-
-				fmt.Printf("\t\t end originl: ")
-				for i := end - 20; i < end; i++ {
-					fmt.Printf(" %x", eventData[i])
-				}
-				fmt.Printf("\n")
-
-				ReadCommonHeader(payload)
-
+				nRead := readEquipment(eventData[startLDCPayload:], startPosition)
 				// Next equipment
-				eqPosition += int(eqHeader.EquipmentSize)
-				if (eqPosition - position) >= int(ldcHeader.EventSize) {
+				startPosition += nRead
+				if startPosition+int(ldcHeader.EventHeadSize) >= int(ldcHeader.EventSize) {
 					break
 				}
 			}
