@@ -66,44 +66,51 @@ func main() {
 	}
 	defer file.Close()
 
-	var evtHeader EventHeaderStruct
-	headerSize := unsafe.Sizeof(evtHeader)
-	fmt.Println("Header size:", headerSize)
-
-	evtCount := 1
 	for {
-		headerBinary := make([]byte, headerSize)
-		nRead, err := file.Read(headerBinary)
+		err := readEvent(file)
 		if err != nil {
-			fmt.Println("Error reading header:", err)
 			break
-		}
-		if nRead == 0 {
-			fmt.Println("End of file")
-			break
-		}
-		headerReader := bytes.NewReader(headerBinary)
-		binary.Read(headerReader, binary.LittleEndian, &evtHeader)
-		fmt.Printf("Event count: %d, evt id: %d. GDC %d, LDC %d\n", evtCount, evtHeader.EventId, evtHeader.EventGdcId, evtHeader.EventLdcId)
-		fmt.Println("Header:", evtHeader)
-		fmt.Println("Superevent:", evtHeader.EventTypeAttribute[0]&SUPER_EVENT)
-
-		payloadSize := uint32(evtHeader.EventSize) - uint32(headerSize)
-		eventData := make([]byte, payloadSize)
-		file.Read(eventData)
-
-		// Read LDCs
-		position := 0
-		for {
-			nRead := readLDC(eventData, position)
-			// Next LDC
-			position += nRead
-			fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
-			if position >= len(eventData) {
-				break
-			}
 		}
 	}
+}
+
+func readEvent(file *os.File) error {
+	var header EventHeaderStruct
+	headerSize := unsafe.Sizeof(header)
+	fmt.Println("GDC Header size:", headerSize)
+	headerBinary := make([]byte, headerSize)
+	nRead, err := file.Read(headerBinary)
+	if err != nil {
+		fmt.Println("Error reading header:", err)
+		return err
+	}
+	if nRead == 0 {
+		fmt.Println("End of file")
+		return err
+	}
+
+	headerReader := bytes.NewReader(headerBinary)
+	binary.Read(headerReader, binary.LittleEndian, &header)
+	fmt.Printf("Evt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
+	fmt.Println("Header:", header)
+	fmt.Println("Superevent:", header.EventTypeAttribute[0]&SUPER_EVENT)
+
+	payloadSize := uint32(header.EventSize) - uint32(headerSize)
+	eventData := make([]byte, payloadSize)
+	file.Read(eventData)
+
+	// Read LDCs
+	position := 0
+	for {
+		nRead := readLDC(eventData, position)
+		// Next LDC
+		position += nRead
+		fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
+		if position >= len(eventData) {
+			break
+		}
+	}
+	return nil
 }
 
 func readLDC(eventData []byte, position int) int {
