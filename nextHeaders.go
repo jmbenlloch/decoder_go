@@ -53,7 +53,7 @@ type EventFormat struct {
 	ChannelMask      uint16
 	TriggerFT        uint16
 	Timestamp        uint64
-	FTBit            bool
+	FTBit            int32
 	NumberOfChannels uint16
 	FecID            uint16
 	Baselines        []uint16
@@ -233,8 +233,8 @@ func readCTandFTh(data []uint16, position int, evtFormat *EventFormat) int {
 	Timestamp = (Timestamp << 10) + uint64((data[position] & 0x03FF))
 	Timestamp = Timestamp & 0x03FFFFFFFFFF
 
-	//FTBit := CheckBit(data[position], 15)
-	FTBit := (data[position] & 0x8000) > 0
+	// We use 32 bits to avoid overflow later
+	FTBit := int32((data[position] & 0x8000) >> 15)
 	position++
 
 	fmt.Println("Timestamp:", Timestamp)

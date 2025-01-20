@@ -6,71 +6,27 @@ import (
 	"fmt"
 	"os"
 	"unsafe"
+
+	sqlx "github.com/jmoiron/sqlx"
 )
 
-func readEquipment(eventData []byte, position int) int {
-	var eqHeader EquipmentHeaderStruct
-	eqHeaderSize := unsafe.Sizeof(eqHeader)
-	fmt.Println("Equipment Header size:", eqHeaderSize)
+const CLOCK_TICK float32 = 0.025
 
-	fmt.Println("\t\tPosition:", position)
+// Map to keep SiPM data until is read. FEC-ID -> SiPM data
+var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 
-	eqHeaderBinary := eventData[position : position+int(eqHeaderSize)]
-	eqHeaderReader := bytes.NewReader(eqHeaderBinary)
-	binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
-	fmt.Printf("\t\tEq id: %d. eq type %d\n", eqHeader.EquipmentId, eqHeader.EquipmentType)
-	fmt.Println("\t\tHeader:", eqHeader)
-	fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", position)
-
-	start := position + int(eqHeaderSize)
-	end := position + int(eqHeader.EquipmentSize)
-	payload := flipWords(eventData[start:end])
-
-	fmt.Printf("\t\t payload: ")
-	for i := 0; i < 20; i++ {
-		fmt.Printf(" %x", payload[i])
-	}
-	fmt.Printf("\n")
-
-	fmt.Printf("\t\t originl: ")
-	for i := 0; i < 20; i++ {
-		fmt.Printf(" %x", eventData[start+i])
-	}
-	fmt.Printf("\n")
-
-	fmt.Printf("\t\t end payload: ")
-	for i := len(payload) - 20; i < len(payload); i++ {
-		fmt.Printf(" %x", payload[i])
-	}
-	fmt.Printf("\n")
-
-	fmt.Printf("\t\t end originl: ")
-	for i := end - 20; i < end; i++ {
-		fmt.Printf(" %x", eventData[i])
-	}
-	fmt.Printf("\n")
-
-	evtFormat := ReadCommonHeader(payload)
-
-	switch evtFormat.FWVersion {
-	case 10:
-		fmt.Println("FW Version 10")
-		switch evtFormat.FecType {
-		case 0:
-			fmt.Println("PMT FEC")
-		case 1:
-			fmt.Println("SiPM FEC")
-		case 2:
-			fmt.Println("Trigger FEC")
-			ReadTriggerFEC(payload[evtFormat.HeaderSize:])
-		}
-	}
-
-	nRead := int(eqHeader.EquipmentSize)
-	return nRead
-}
+// var huffmanCodesPmts *HuffmanNode
+var huffmanCodesSipms *HuffmanNode
+var dbConn *sqlx.DB
 
 func main() {
+	var err error
+	dbConn, err = ConnectToDatabase()
+	if err != nil {
+		fmt.Println("Error connecting to database:", err)
+		return
+	}
+
 	file, err := os.Open("run_14711.ldc1next.next-100.045.rd")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -85,7 +41,6 @@ func main() {
 		}
 	}
 }
-
 func readEvent(file *os.File) error {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
@@ -140,7 +95,7 @@ func readLDC(eventData []byte, position int) int {
 	startLDCPayload := position + int(header.EventHeadSize)
 	startPosition := 0
 	for {
-		nRead := readEquipment(eventData[startLDCPayload:], startPosition)
+		nRead := readEquipment(eventData[startLDCPayload:], startPosition, header)
 		// Next equipment
 		startPosition += nRead
 		if startPosition+int(header.EventHeadSize) >= int(header.EventSize) {
@@ -149,6 +104,69 @@ func readLDC(eventData []byte, position int) int {
 	}
 
 	return int(header.EventSize)
+}
+
+func readEquipment(eventData []byte, position int, header EventHeaderStruct) int {
+	var eqHeader EquipmentHeaderStruct
+	eqHeaderSize := unsafe.Sizeof(eqHeader)
+	fmt.Println("Equipment Header size:", eqHeaderSize)
+
+	fmt.Println("\t\tPosition:", position)
+
+	eqHeaderBinary := eventData[position : position+int(eqHeaderSize)]
+	eqHeaderReader := bytes.NewReader(eqHeaderBinary)
+	binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
+	fmt.Printf("\t\tEq id: %d. eq type %d\n", eqHeader.EquipmentId, eqHeader.EquipmentType)
+	fmt.Println("\t\tHeader:", eqHeader)
+	fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", position)
+
+	start := position + int(eqHeaderSize)
+	end := position + int(eqHeader.EquipmentSize)
+	payload := flipWords(eventData[start:end])
+
+	fmt.Printf("\t\t payload: ")
+	for i := 0; i < 20; i++ {
+		fmt.Printf(" %x", payload[i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("\t\t originl: ")
+	for i := 0; i < 20; i++ {
+		fmt.Printf(" %x", eventData[start+i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("\t\t end payload: ")
+	for i := len(payload) - 20; i < len(payload); i++ {
+		fmt.Printf(" %x", payload[i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("\t\t end originl: ")
+	for i := end - 20; i < end; i++ {
+		fmt.Printf(" %x", eventData[i])
+	}
+	fmt.Printf("\n")
+
+	evtFormat := ReadCommonHeader(payload)
+
+	switch evtFormat.FWVersion {
+	case 10:
+		fmt.Println("FW Version 10")
+		switch evtFormat.FecType {
+		case 0:
+			fmt.Println("PMT FEC")
+		case 1:
+			fmt.Println("SiPM FEC")
+			ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+		case 2:
+			fmt.Println("Trigger FEC")
+			ReadTriggerFEC(payload[evtFormat.HeaderSize:])
+		}
+	}
+
+	nRead := int(eqHeader.EquipmentSize)
+	return nRead
 }
 
 func flipWords(data []byte) []uint16 {
