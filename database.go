@@ -7,13 +7,9 @@ import (
 	sqlx "github.com/jmoiron/sqlx" //make alias name the package to sqlx
 )
 
-func ConnectToDatabase() (*sqlx.DB, error) {
-	user := "nextreader"
-	password := "readonly"
-	host := "next.ific.uv.es"
+func ConnectToDatabase(user string, pass string, host string, dbname string) (*sqlx.DB, error) {
 	port := "3306"
-	database := "NEXT100DB"
-	dbURI := fmt.Sprintf("%s:%s@(%s:%s)/%s?parseTime=true", user, password, host, port, database)
+	dbURI := fmt.Sprintf("%s:%s@(%s:%s)/%s?parseTime=true", user, pass, host, port, dbname)
 	db, err := sqlx.Connect("mysql", dbURI)
 	return db, err
 }

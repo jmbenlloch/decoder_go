@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"os"
 	"unsafe"
@@ -20,14 +21,22 @@ var huffmanCodesSipms *HuffmanNode
 var dbConn *sqlx.DB
 
 func main() {
-	var err error
-	dbConn, err = ConnectToDatabase()
+	configFilename := flag.String("config", "", "Configuration file path")
+	flag.Parse()
+
+	configuration, err := LoadConfiguration(*configFilename)
+	if err != nil {
+		fmt.Println("Error reading configuration file: ", err)
+		return
+	}
+
+	dbConn, err = ConnectToDatabase(configuration.User, configuration.Passwd, configuration.Host, configuration.DBName)
 	if err != nil {
 		fmt.Println("Error connecting to database:", err)
 		return
 	}
 
-	file, err := os.Open("run_14711.ldc1next.next-100.045.rd")
+	file, err := os.Open(configuration.FileIn)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return
