@@ -69,8 +69,40 @@ func main() {
 				binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
 				fmt.Printf("\t\tEquipment count: %d, eq id: %d. eq type %d\n", equipmentCount, eqHeader.EquipmentId, eqHeader.EquipmentType)
 				fmt.Println("\t\tHeader:", eqHeader)
-				eqPosition += int(eqHeader.EquipmentSize)
 				fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", eqPosition, eqPosition-position, ldcHeader.EventSize)
+
+				start := eqPosition + int(eqHeaderSize)
+				end := eqPosition + int(eqHeader.EquipmentSize)
+				payload := flipWords(eventData[start:end])
+
+				fmt.Printf("\t\t payload: ")
+				for i := 0; i < 20; i++ {
+					fmt.Printf(" %x", payload[i])
+				}
+				fmt.Printf("\n")
+
+				fmt.Printf("\t\t originl: ")
+				for i := 0; i < 20; i++ {
+					fmt.Printf(" %x", eventData[start+i])
+				}
+				fmt.Printf("\n")
+
+				fmt.Printf("\t\t end payload: ")
+				for i := len(payload) - 20; i < len(payload); i++ {
+					fmt.Printf(" %x", payload[i])
+				}
+				fmt.Printf("\n")
+
+				fmt.Printf("\t\t end originl: ")
+				for i := end - 20; i < end; i++ {
+					fmt.Printf(" %x", eventData[i])
+				}
+				fmt.Printf("\n")
+
+				ReadCommonHeader(payload)
+
+				// Next equipment
+				eqPosition += int(eqHeader.EquipmentSize)
 				if (eqPosition - position) >= int(ldcHeader.EventSize) {
 					break
 				}
@@ -84,4 +116,55 @@ func main() {
 			}
 		}
 	}
+}
+
+func flipWords(data []byte) []uint16 {
+	positionIn := 0
+	positionOut := 0
+	fmt.Println("Data size:", len(data))
+	fmt.Printf("Data: ")
+	for i := len(data) - 20; i < len(data); i++ {
+		fmt.Printf(" %x", data[i])
+	}
+	fmt.Printf("\n")
+
+	dataUint16 := *(*[]uint16)(unsafe.Pointer(&data))
+	fmt.Println("Data size casted to uint16:", len(dataUint16))
+	fmt.Printf("Data casted: ")
+	for i := len(data)/2 - 20; i < len(data)/2; i++ {
+		fmt.Printf(" %x", dataUint16[i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("Data start: ")
+	for i := 0; i < 20; i++ {
+		fmt.Printf(" %x", data[i])
+	}
+	fmt.Printf("\n")
+
+	fmt.Printf("Data start casted: ")
+	for i := 0; i < 20; i++ {
+		fmt.Printf(" %x", dataUint16[i])
+	}
+	fmt.Printf("\n")
+
+	dataFlipped := make([]uint16, len(data)/2) // TODO round up
+
+	for positionIn*2 < len(data) {
+		//fmt.Println(positionIn*2, len(data)/2)
+		// Skip sequence counters. Size taken empirically
+		if positionIn > 0 && positionIn%3996 == 0 {
+			//fmt.Printf("Skipping positionIn: %d. Values %x %x\n", positionIn, dataUint16[positionIn], dataUint16[positionIn+1])
+			positionIn += 2
+		}
+		dataFlipped[positionOut] = dataUint16[positionIn+1]
+		dataFlipped[positionOut+1] = dataUint16[positionIn]
+		//fmt.Printf("PositionIn: %d, PositionOut: %d, Data: out (%x %x), in (%x %x)\n", positionIn, positionOut, dataFlipped[positionOut], dataFlipped[positionOut+1], dataUint16[positionIn], dataUint16[positionIn+1])
+		positionIn += 2
+		positionOut += 2
+	}
+	//fmt.Println("positionOut ", positionOut)
+	//fmt.Println("positionIn ", positionIn)
+
+	return dataFlipped[:positionOut]
 }
