@@ -68,7 +68,7 @@ func decode_compressed_value(previous_value int32, data uint32, control_code int
 	if wfvalue == control_code {
 		wfvalue = (int32(data) >> (current_bit - 11)) & 0x0FFF
 		current_bit -= 12
-		// printf("12-bit wfvalue: %d\n", wfvalue);
+		//fmt.Printf("12-bit wfvalue: %x\n", wfvalue)
 	} else {
 		wfvalue = previous_value + wfvalue
 	}

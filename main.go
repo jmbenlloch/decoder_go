@@ -15,7 +15,7 @@ const CLOCK_TICK float32 = 0.025
 // Map to keep SiPM data until is read. FEC-ID -> SiPM data
 var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 
-// var huffmanCodesPmts *HuffmanNode
+var huffmanCodesPmts *HuffmanNode
 var huffmanCodesSipms *HuffmanNode
 var dbConn *sqlx.DB
 
@@ -125,7 +125,7 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct) int
 	payload := flipWords(eventData[start:end])
 
 	fmt.Printf("\t\t payload: ")
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 30; i++ {
 		fmt.Printf(" %x", payload[i])
 	}
 	fmt.Printf("\n")
@@ -156,6 +156,7 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct) int
 		switch evtFormat.FecType {
 		case 0:
 			fmt.Println("PMT FEC")
+			ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
 		case 1:
 			fmt.Println("SiPM FEC")
 			ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
