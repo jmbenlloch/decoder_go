@@ -45,14 +45,23 @@ func main() {
 	}
 	defer file.Close()
 
+	evtCount := -1
 	for {
-		err := readEvent(file)
+		eventData, err := readEvent(file)
 		if err != nil {
 			break
 		}
+		evtCount++
+		if evtCount >= configuration.MaxEvents {
+			break
+		}
+		if evtCount < configuration.Skip {
+			continue
+		}
+		readGDC(eventData)
 	}
 }
-func readEvent(file *os.File) error {
+func readEvent(file *os.File) ([]byte, error) {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
 	fmt.Println("GDC Header size:", headerSize)
@@ -60,11 +69,11 @@ func readEvent(file *os.File) error {
 	nRead, err := file.Read(headerBinary)
 	if err != nil {
 		fmt.Println("Error reading header:", err)
-		return err
+		return nil, err
 	}
 	if nRead == 0 {
 		fmt.Println("End of file")
-		return err
+		return nil, err
 	}
 
 	headerReader := bytes.NewReader(headerBinary)
@@ -76,7 +85,10 @@ func readEvent(file *os.File) error {
 	payloadSize := uint32(header.EventSize) - uint32(headerSize)
 	eventData := make([]byte, payloadSize)
 	file.Read(eventData)
+	return eventData, nil
+}
 
+func readGDC(eventData []byte) {
 	// Read LDCs
 	position := 0
 	for {
@@ -88,7 +100,6 @@ func readEvent(file *os.File) error {
 			break
 		}
 	}
-	return nil
 }
 
 func readLDC(eventData []byte, position int) int {
