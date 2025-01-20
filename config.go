@@ -6,25 +6,26 @@ import (
 )
 
 type Configuration struct {
-	MaxEvents  int    `json:"max_events"`
-	Verbosity  int    `json:"verbosity"`
-	ExtTrigger int    `json:"ext_trigger"`
-	TwoFiles   bool   `json:"two_files"`
-	FileIn     string `json:"file_in"`
-	FileOut    string `json:"file_out"`
-	FileOut2   string `json:"file_out2"`
-	TrgCode1   int    `json:"trg_code1"`
-	TrgCode2   int    `json:"trg_code2"`
-	ReadPMTs   bool   `json:"read_pmts"`
-	ReadSiPMs  bool   `json:"read_sipms"`
-	SplitTrg   bool   `json:"split_trg"`
-	NoDB       bool   `json:"no_db"`
-	Discard    bool   `json:"discard"`
-	Skip       int    `json:"skip"`
-	Host       string `json:"host"`
-	User       string `json:"user"`
-	Passwd     string `json:"pass"`
-	DBName     string `json:"dbname"`
+	MaxEvents   int    `json:"max_events"`
+	Verbosity   int    `json:"verbosity"`
+	ExtTrigger  int    `json:"ext_trigger"`
+	TwoFiles    bool   `json:"two_files"`
+	FileIn      string `json:"file_in"`
+	FileOut     string `json:"file_out"`
+	FileOut2    string `json:"file_out2"`
+	TrgCode1    int    `json:"trg_code1"`
+	TrgCode2    int    `json:"trg_code2"`
+	ReadPMTs    bool   `json:"read_pmts"`
+	ReadSiPMs   bool   `json:"read_sipms"`
+	ReadTrigger bool   `json:"read_trigger"`
+	SplitTrg    bool   `json:"split_trg"`
+	NoDB        bool   `json:"no_db"`
+	Discard     bool   `json:"discard"`
+	Skip        int    `json:"skip"`
+	Host        string `json:"host"`
+	User        string `json:"user"`
+	Passwd      string `json:"pass"`
+	DBName      string `json:"dbname"`
 }
 
 func LoadConfiguration(filename string) (Configuration, error) {
@@ -39,6 +40,7 @@ func LoadConfiguration(filename string) (Configuration, error) {
 	config.TrgCode2 = 9
 	config.ReadPMTs = true
 	config.ReadSiPMs = true
+	config.ReadTrigger = true
 	config.SplitTrg = false
 	config.NoDB = false
 	config.Discard = true

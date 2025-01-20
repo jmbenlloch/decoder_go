@@ -19,12 +19,14 @@ var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 var huffmanCodesPmts *HuffmanNode
 var huffmanCodesSipms *HuffmanNode
 var dbConn *sqlx.DB
+var configuration Configuration
 
 func main() {
 	configFilename := flag.String("config", "", "Configuration file path")
 	flag.Parse()
 
-	configuration, err := LoadConfiguration(*configFilename)
+	var err error
+	configuration, err = LoadConfiguration(*configFilename)
 	if err != nil {
 		fmt.Println("Error reading configuration file: ", err)
 		return
@@ -165,13 +167,19 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct) int
 		switch evtFormat.FecType {
 		case 0:
 			fmt.Println("PMT FEC")
-			ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+			if configuration.ReadPMTs {
+				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+			}
 		case 1:
 			fmt.Println("SiPM FEC")
-			ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+			if configuration.ReadSiPMs {
+				ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+			}
 		case 2:
 			fmt.Println("Trigger FEC")
-			ReadTriggerFEC(payload[evtFormat.HeaderSize:])
+			if configuration.ReadTrigger {
+				ReadTriggerFEC(payload[evtFormat.HeaderSize:])
+			}
 		}
 	}
 
