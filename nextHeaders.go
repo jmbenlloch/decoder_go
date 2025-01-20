@@ -4,31 +4,53 @@ import "fmt"
 
 func ReadCommonHeader(data []uint16) {
 	position := 0
+	evtFormat := EventFormat{}
 	sequenceCounter, position := readSeqCounter(data, position)
 	fmt.Println("Sequence Counter:", sequenceCounter)
 	if sequenceCounter == 0 {
-		format, position := readFormatID(data, position)
-		position = readWordCount(data, position)
+		position := readFormatID(data, position, &evtFormat)
+		position = readWordCount(data, position, &evtFormat)
 		position = readEventID(data, position)
-		if format.FWVersion == 10 {
-			position = readEventConfJuliett(data, position)
+		if evtFormat.FWVersion == 10 {
+			position = readEventConfJuliett(data, position, &evtFormat)
 		}
-		if format.FWVersion >= 9 {
-			if format.Baseline > 0 {
-				position = readIndiaBaselines(data, position)
+		if evtFormat.FWVersion >= 9 {
+			if evtFormat.Baseline {
+				position = readIndiaBaselines(data, position, &evtFormat)
 			}
-			position = readIndiaFecID(data, position)
+			position = readIndiaFecID(data, position, &evtFormat)
 		}
-		position = readCTandFTh(data, position)
-		position = readFTl(data, position)
+		position = readCTandFTh(data, position, &evtFormat)
+		position = readFTl(data, position, &evtFormat)
 	}
 }
 
 func readSeqCounter(data []uint16, position int) (uint32, int) {
-	var sequenceCounter uint32
-	sequenceCounter = uint32((data[position+1] & 0x0ffff) + (data[position+1] << 16))
+	sequenceCounter := (uint32(data[position+1]) & 0x0ffff) + (uint32(data[position+1]) << 16)
 	position += 2
 	return sequenceCounter, position
+}
+
+type EventFormat struct {
+	FecType          uint16
+	ZeroSuppression  bool
+	CompressedData   bool
+	Baseline         bool
+	DualModeBit      bool
+	ErrorBit         bool
+	FWVersion        uint16
+	WordCount        uint16
+	BufferSamples    uint32
+	PreTrigger       uint32
+	BufferSamples2   uint32
+	PreTrigger2      uint32
+	ChannelMask      uint16
+	TriggerFT        uint16
+	Timestamp        uint64
+	FTBit            bool
+	NumberOfChannels uint16
+	FecID            uint16
+	Baselines        []uint16
 }
 
 type FormatID struct {
@@ -41,7 +63,7 @@ type FormatID struct {
 	FWVersion       uint16
 }
 
-func readFormatID(data []uint16, position int) (FormatID, int) {
+func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 	//Format ID H
 	FecType := data[position] & 0x000F
 	ZeroSuppression := (data[position] & 0x0010) >> 4
@@ -55,8 +77,6 @@ func readFormatID(data []uint16, position int) (FormatID, int) {
 	FWVersion := data[position] & 0x0FFFF
 	position++
 
-	formatData := FormatID{FecType, ZeroSuppression, CompressedData, Baseline, DualModeBit, ErrorBit, FWVersion}
-
 	fmt.Println("FecType:", FecType)
 	fmt.Println("ZeroSuppression:", ZeroSuppression)
 	fmt.Println("CompressedData:", CompressedData)
@@ -65,13 +85,22 @@ func readFormatID(data []uint16, position int) (FormatID, int) {
 	fmt.Println("ErrorBit:", ErrorBit)
 	fmt.Println("FWVersion:", FWVersion)
 
-	return formatData, position
+	evtFormat.FecType = FecType
+	evtFormat.ZeroSuppression = ZeroSuppression > 0
+	evtFormat.CompressedData = CompressedData > 0
+	evtFormat.Baseline = Baseline > 0
+	evtFormat.DualModeBit = DualModeBit > 0
+	evtFormat.ErrorBit = ErrorBit > 0
+	evtFormat.FWVersion = FWVersion
+
+	return position
 }
 
-func readWordCount(data []uint16, position int) int {
+func readWordCount(data []uint16, position int, evtFormat *EventFormat) int {
 	WordCounter := data[position] & 0x0FFFF
 	position++
 	fmt.Println("Word Counter:", WordCounter)
+	evtFormat.WordCount = WordCounter
 	return position
 }
 
@@ -84,7 +113,7 @@ func readEventID(data []uint16, position int) int {
 	return position
 }
 
-func readEventConfJuliett(data []uint16, position int) int {
+func readEventConfJuliett(data []uint16, position int, evtFormat *EventFormat) int {
 	//Event conf0
 	BufferSamples := 2 * uint32(data[position]&0x0FFFF)
 	position++
@@ -105,6 +134,12 @@ func readEventConfJuliett(data []uint16, position int) int {
 	ChannelMask := data[position] & 0x0FFFF
 	position++
 
+	evtFormat.BufferSamples = BufferSamples
+	evtFormat.PreTrigger = PreTriggerSamples
+	evtFormat.BufferSamples2 = BufferSamples2
+	evtFormat.PreTrigger2 = PreTriggerSamples2
+	evtFormat.ChannelMask = ChannelMask
+
 	fmt.Println("Buffer Samples:", BufferSamples)
 	fmt.Println("PreTrigger Samples:", PreTriggerSamples)
 	fmt.Println("Buffer Samples2:", BufferSamples2)
@@ -113,12 +148,14 @@ func readEventConfJuliett(data []uint16, position int) int {
 	return position
 }
 
-func readIndiaBaselines(data []uint16, position int) int {
+func readIndiaBaselines(data []uint16, position int, evtFormat *EventFormat) int {
 	// Baselines
-	// Pattern goes like this (two times):
+	// Pattern goes like this:
 	// 0xFFF0, 0x000F, 12 bits,  4 bits; ch0, ch1
 	// 0xFF00, 0x00FF,  8 bits,  8 bits; ch1, ch2
 	// 0x000F, 0x0FFF,  4 bits, 12 bits; ch2, ch3
+	// 0xFFF0, 0x000F, 12 bits,  4 bits; ch4, ch5
+	// 0xFF00, 0x0000,  8 bits,  8 bits; ch5
 	var baselineTemp uint16
 	baselines := make([]uint16, 0)
 
@@ -150,27 +187,30 @@ func readIndiaBaselines(data []uint16, position int) int {
 
 	//Baseline ch5
 	position++
-	// TODO: Check last line of this block. Maybe there is an error with last bits
 	baselineTemp = baselineTemp + ((data[position] & 0xFF00) >> 8)
 	baselines = append(baselines, baselineTemp)
-	baselineTemp = (data[position] & 0x00FF) << 4
 	position++
+
+	evtFormat.Baselines = baselines
 
 	fmt.Println("Baselines:", baselines)
 	return position
 }
 
-func readIndiaFecID(data []uint16, position int) int {
+func readIndiaFecID(data []uint16, position int, evtFormat *EventFormat) int {
 	NumberOfChannels := data[position] & 0x001F
-	FecId := (data[position] & 0x0FFE0) >> 5
+	FecID := (data[position] & 0x0FFE0) >> 5
 	position++
 
 	fmt.Println("Number of Channels:", NumberOfChannels)
-	fmt.Println("Fec ID:", FecId)
+	fmt.Println("Fec ID:", FecID)
+
+	evtFormat.NumberOfChannels = NumberOfChannels
+	evtFormat.FecID = FecID
 	return position
 }
 
-func readCTandFTh(data []uint16, position int) int {
+func readCTandFTh(data []uint16, position int, evtFormat *EventFormat) int {
 	//Timestamp high
 	var Timestamp uint64
 	Timestamp = uint64((data[position] & 0x0FFFF)) << 16
@@ -191,13 +231,18 @@ func readCTandFTh(data []uint16, position int) int {
 	fmt.Println("Timestamp:", Timestamp)
 	fmt.Println("FTBit:", FTBit)
 
+	evtFormat.Timestamp = Timestamp
+	evtFormat.FTBit = FTBit
+
 	return position
 }
 
-func readFTl(data []uint16, position int) int {
+func readFTl(data []uint16, position int, evtFormat *EventFormat) int {
 	TriggerFT := data[position] & 0x0FFFF
 	position++
 	fmt.Println("TriggerFT:", TriggerFT)
+
+	evtFormat.TriggerFT = TriggerFT
 
 	return position
 }
