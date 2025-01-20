@@ -2,15 +2,15 @@ package main
 
 import "fmt"
 
-func ReadCommonHeader(data []uint16) {
+func ReadCommonHeader(data []uint16) EventFormat {
 	position := 0
 	evtFormat := EventFormat{}
 	sequenceCounter, position := readSeqCounter(data, position)
 	fmt.Println("Sequence Counter:", sequenceCounter)
 	if sequenceCounter == 0 {
-		position := readFormatID(data, position, &evtFormat)
+		position = readFormatID(data, position, &evtFormat)
 		position = readWordCount(data, position, &evtFormat)
-		position = readEventID(data, position)
+		position = readEventID(data, position, &evtFormat)
 		if evtFormat.FWVersion == 10 {
 			position = readEventConfJuliett(data, position, &evtFormat)
 		}
@@ -23,6 +23,10 @@ func ReadCommonHeader(data []uint16) {
 		position = readCTandFTh(data, position, &evtFormat)
 		position = readFTl(data, position, &evtFormat)
 	}
+
+	evtFormat.HeaderSize = uint16(position)
+	return evtFormat
+
 }
 
 func readSeqCounter(data []uint16, position int) (uint32, int) {
@@ -40,6 +44,8 @@ type EventFormat struct {
 	ErrorBit         bool
 	FWVersion        uint16
 	WordCount        uint16
+	TriggerType      uint16
+	TriggerCounter   uint32
 	BufferSamples    uint32
 	PreTrigger       uint32
 	BufferSamples2   uint32
@@ -51,6 +57,7 @@ type EventFormat struct {
 	NumberOfChannels uint16
 	FecID            uint16
 	Baselines        []uint16
+	HeaderSize       uint16
 }
 
 type FormatID struct {
@@ -104,12 +111,14 @@ func readWordCount(data []uint16, position int, evtFormat *EventFormat) int {
 	return position
 }
 
-func readEventID(data []uint16, position int) int {
+func readEventID(data []uint16, position int, evtFormat *EventFormat) int {
 	TriggerType := data[position] & 0x000F
-	TriggerCounter := ((data[position] & 0x0FFF0) << 12) + (data[position+1] & 0x0FFFF)
+	TriggerCounter := (uint32(data[position]&0x0FFF0) << 12) + (uint32(data[position+1]) & 0x0FFFF)
 	position += 2
 	fmt.Println("Trigger Type:", TriggerType)
 	fmt.Println("Trigger Counter:", TriggerCounter)
+	evtFormat.TriggerType = TriggerType
+	evtFormat.TriggerCounter = TriggerCounter
 	return position
 }
 

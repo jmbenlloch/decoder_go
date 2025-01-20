@@ -50,15 +50,27 @@ func readEquipment(eventData []byte, position int) int {
 	}
 	fmt.Printf("\n")
 
-	ReadCommonHeader(payload)
+	evtFormat := ReadCommonHeader(payload)
+
+	switch evtFormat.FWVersion {
+	case 10:
+		fmt.Println("FW Version 10")
+		switch evtFormat.FecType {
+		case 0:
+			fmt.Println("PMT FEC")
+		case 1:
+			fmt.Println("SiPM FEC")
+		case 2:
+			fmt.Println("Trigger FEC")
+			ReadTriggerFEC(payload[evtFormat.HeaderSize:])
+		}
+	}
 
 	nRead := int(eqHeader.EquipmentSize)
 	return nRead
 }
 
 func main() {
-	println("Hello, World!")
-
 	file, err := os.Open("run_14711.ldc1next.next-100.045.rd")
 	if err != nil {
 		fmt.Println("Error opening file:", err)
