@@ -17,6 +17,16 @@ type EventDataHDF5 struct {
 	timestamp  uint64
 }
 
+type TriggerParamsHDF5 struct {
+	param string
+	value int32
+}
+
+type SensorMappingHDF5 struct {
+	channel  int32
+	sensorID int32
+}
+
 func openFile(fname string) *hdf5.File {
 	// create the file
 	f, err := hdf5.CreateFile(fname, hdf5.F_ACC_TRUNC)
@@ -117,6 +127,77 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 	}
 	fmt.Printf(":: dset (id=%d)\n", dset.ID())
 	return dset
+}
+
+func writeMappingConfig(dataset *hdf5.Dataset, event *[]SensorMappingHDF5) {
+	length := uint(len(*event))
+	fmt.Println(length)
+	fmt.Println(event)
+	dims := []uint{length}
+	dataspace, err := hdf5.CreateSimpleDataspace(dims, nil)
+	if err != nil {
+		fmt.Println("space")
+		panic(err)
+	}
+
+	// extend
+	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
+	eventsInFile := dimsGot[0]
+	fmt.Println("Size: ", dimsGot, maxdimsGot)
+	newsize := []uint{eventsInFile + length}
+	dataset.Resize(newsize)
+	filespace := dataset.Space()
+	fmt.Println(filespace)
+
+	start := []uint{eventsInFile}
+	count := []uint{length}
+	filespace.SelectHyperslab(start, nil, count, nil)
+
+	// write data to the dataset
+	fmt.Printf(":: dset.Write...\n")
+	//err = dset.Write(&s2)
+	err = dataset.WriteSubset(event, dataspace, filespace)
+	if err != nil {
+		fmt.Println("final write")
+		panic(err)
+	}
+	fmt.Printf(":: dset.Write... [ok]\n")
+}
+
+func writeTriggerConfig(dataset *hdf5.Dataset, event TriggerParamsHDF5) {
+	s2 := make([]TriggerParamsHDF5, 0)
+	s2 = append(s2, event)
+	length := uint(len(s2))
+
+	dims := []uint{length}
+	dataspace, err := hdf5.CreateSimpleDataspace(dims, nil)
+	if err != nil {
+		fmt.Println("space")
+		panic(err)
+	}
+
+	// extend
+	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
+	eventsInFile := dimsGot[0]
+	fmt.Println("Size: ", dimsGot, maxdimsGot)
+	newsize := []uint{eventsInFile + length}
+	dataset.Resize(newsize)
+	filespace := dataset.Space()
+	fmt.Println(filespace)
+
+	start := []uint{eventsInFile}
+	count := []uint{length}
+	filespace.SelectHyperslab(start, nil, count, nil)
+
+	// write data to the dataset
+	fmt.Printf(":: dset.Write...\n")
+	//err = dset.Write(&s2)
+	err = dataset.WriteSubset(&s2, dataspace, filespace)
+	if err != nil {
+		fmt.Println("final write")
+		panic(err)
+	}
+	fmt.Printf(":: dset.Write... [ok]\n")
 }
 
 func writeEventData(dataset *hdf5.Dataset, event EventDataHDF5) {
