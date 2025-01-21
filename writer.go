@@ -32,7 +32,7 @@ func NewWriter(config Configuration) *Writer {
 	writer.SensorsGroup, _ = createGroup(writer.File1, "Sensors")
 	writer.TriggerGroup, _ = createGroup(writer.File1, "Trigger")
 	writer.EventTable = createTable(writer.RunGroup, "events", EventDataHDF5{})
-	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", EventDataHDF5{})
+	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", RunInfoHDF5{})
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
 	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPmt", SensorMappingHDF5{})
 	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSipm", SensorMappingHDF5{})

@@ -46,7 +46,9 @@ func createWaveformsArray(group *hdf5.Group, name string, nSensors int, nSamples
 	dimsArray := []uint{0, 0, 0}
 	unlimitedDims := -1 // H5S_UNLIMITED is -1L
 	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors), uint(nSamples)}
-	chunks := []uint{1, 50, 32768}
+
+	//chunks := []uint{1, 50, 32768}
+	chunks := []uint{1, 50, uint(nSamples)}
 	dataset := createArray(group, name, dimsArray, maxDimsArray, chunks)
 	return dataset
 }
