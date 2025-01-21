@@ -63,13 +63,13 @@ func (w *Writer) WriteEvent(event *EventType) {
 	//	param: "test",
 	//	value: 1,
 	//}
-	writeEventData(w.EventTable, datatest)
+	writeEntryToTable(w.EventTable, datatest)
 	//writeTriggerConfig(w.TriggerParamsTable, triggerConfig)
 
 	pmtSorted := sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
 	sipmSorted := sortSensorsBySensorID(event.SensorsMap.Sipms.ToSensorID)
-	writeMappingConfig(w.PmtMappingTable, &pmtSorted)
-	writeMappingConfig(w.SipmMappingTable, &sipmSorted)
+	writeArrayToTable(w.PmtMappingTable, &pmtSorted)
+	writeArrayToTable(w.SipmMappingTable, &sipmSorted)
 }
 
 func (w *Writer) Close() {
