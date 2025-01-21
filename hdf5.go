@@ -46,7 +46,24 @@ func createWaveformsArray(group *hdf5.Group, name string, nSensors int, nSamples
 	dimsArray := []uint{0, 0, 0}
 	unlimitedDims := -1 // H5S_UNLIMITED is -1L
 	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors), uint(nSamples)}
-	file_spaceArray, err := hdf5.CreateSimpleDataspace(dimsArray, maxDimsArray)
+	chunks := []uint{1, 50, 32768}
+	dataset := createArray(group, name, dimsArray, maxDimsArray, chunks)
+	return dataset
+}
+
+func createBaselinesArray(group *hdf5.Group, name string, nSensors int) *hdf5.Dataset {
+	dimsArray := []uint{0, 0}
+	unlimitedDims := -1 // H5S_UNLIMITED is -1L
+	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors)}
+	chunks := []uint{1, 32768}
+	dataset := createArray(group, name, dimsArray, maxDimsArray, chunks)
+	return dataset
+}
+
+func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, chunks []uint) *hdf5.Dataset {
+	//unlimitedDims := -1 // H5S_UNLIMITED is -1L
+	//maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors), uint(nSamples)}
+	file_spaceArray, err := hdf5.CreateSimpleDataspace(dims, maxDims)
 	if err != nil {
 		panic(err)
 	}
@@ -58,8 +75,7 @@ func createWaveformsArray(group *hdf5.Group, name string, nSensors int, nSamples
 		panic(err)
 	}
 
-	chunksArray := []uint{1, 50, 32768}
-	plistArray.SetChunk(chunksArray)
+	plistArray.SetChunk(chunks)
 	// Set compression level
 	plistArray.SetDeflate(4)
 
@@ -222,6 +238,44 @@ func writeWaveforms(dataset *hdf5.Dataset, data *[]int16) {
 
 	start := []uint{eventsInFile, 0, 0}
 	count := []uint{1, nSensors, nSamples}
+	filespace.SelectHyperslab(start, nil, count, nil)
+
+	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
+	if err != nil {
+		fmt.Println("space")
+		panic(err)
+	}
+
+	// write data to the dataset
+	fmt.Printf(":: dset.Write...\n")
+	//err = dsetArray.Write(&charges)
+	//err = dataset.WriteSubset(data, dataspace, filespace)
+	err = dataset.WriteSubset(data, dataspace, filespace)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf(":: dset.Write... [ok]\n")
+
+	dataspace.Close()
+	filespace.Close()
+}
+
+func writeBaselines(dataset *hdf5.Dataset, data *[]int16) {
+	// extend
+	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
+	eventsInFile := dimsGot[0]
+	nSensors := maxdimsGot[1]
+	fmt.Println("2-Size array: ", dimsGot, maxdimsGot)
+	newsize := []uint{eventsInFile + 1, nSensors}
+	dataset.Resize(newsize)
+	filespace := dataset.Space()
+	fmt.Println(filespace)
+
+	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
+	fmt.Println("3-Size array: ", dimsGot, maxdimsGot)
+
+	start := []uint{eventsInFile, 0}
+	count := []uint{1, nSensors}
 	filespace.SelectHyperslab(start, nil, count, nil)
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)

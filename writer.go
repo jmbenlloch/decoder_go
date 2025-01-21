@@ -21,6 +21,7 @@ type Writer struct {
 	SipmMappingTable   *hdf5.Dataset
 	PmtWaveforms       *hdf5.Dataset
 	SipmWaveforms      *hdf5.Dataset
+	Baselines          *hdf5.Dataset
 }
 
 func NewWriter(config Configuration) *Writer {
@@ -82,8 +83,9 @@ func (w *Writer) WriteEvent(event *EventType) {
 		writeArrayToTable(w.PmtMappingTable, &pmtSorted)
 		writeArrayToTable(w.SipmMappingTable, &sipmSorted)
 
-		w.PmtWaveforms = createWaveformsArray(w.RDGroup, "pmtrwf", npmts, pmtSamples)
 		w.SipmWaveforms = createWaveformsArray(w.RDGroup, "sipmrwf", nsipms, sipmSamples)
+		w.PmtWaveforms = createWaveformsArray(w.RDGroup, "pmtrwf", npmts, pmtSamples)
+		w.Baselines = createBaselinesArray(w.RDGroup, "pmt_baselines", npmts)
 
 		w.FirstEvt = true
 	}
@@ -108,6 +110,12 @@ func (w *Writer) WriteEvent(event *EventType) {
 	}
 	writeWaveforms(w.SipmWaveforms, &sipmData)
 
+	baselines := make([]int16, npmts)
+	for i, sensor := range pmtSorted {
+		baselines[i] = int16(event.Baselines[uint16(sensor.channel)])
+	}
+	writeBaselines(w.Baselines, &baselines)
+
 }
 
 func (w *Writer) Close() {
@@ -115,6 +123,9 @@ func (w *Writer) Close() {
 	w.RunInfoTable.Close()
 	if w.PmtWaveforms != nil {
 		w.PmtWaveforms.Close()
+	}
+	if w.Baselines != nil {
+		w.Baselines.Close()
 	}
 	if w.SipmWaveforms != nil {
 		w.SipmWaveforms.Close()
