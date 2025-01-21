@@ -46,6 +46,9 @@ func main() {
 	}
 	defer file.Close()
 
+	writer := NewWriter(configuration)
+	defer writer.Close()
+
 	evtCount := -1
 	for {
 		header, eventData, err := readEvent(file)
@@ -60,7 +63,7 @@ func main() {
 			continue
 		}
 		event := readGDC(eventData, header)
-		_ = event
+		writer.WriteEvent(&event)
 	}
 }
 func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {

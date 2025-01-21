@@ -1,6 +1,6 @@
 {
     "file_in": "run_14711.ldc1next.next-100.045.rd",
-    "file_out": "run_14711_0045_ldc1_trg0.waveforms.h5",
+    "file_out": "test.h5",
     "file_out2": "",
     "two_files": false,
     "no_db": false,
@@ -8,6 +8,11 @@
     "host": "next.ific.uv.es",
     "user": "nextreader",
     "pass": "readonly",
+	"read_pmts": false,
+	"read_sipms": false,
+	"read_trigger": true,
+	"skip": 3,
+	"max_events": 5,
     "dbname": "NEXT100DB",
     "split_trg": false,
     "max_evts": 1
