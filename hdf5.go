@@ -161,6 +161,9 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
 		panic(err)
 	}
 	fmt.Printf(":: dset.Write... [ok]\n")
+
+	dataspace.Close()
+	filespace.Close()
 }
 
 func writeTriggerConfig(dataset *hdf5.Dataset, event TriggerParamsHDF5) {
@@ -197,6 +200,9 @@ func writeTriggerConfig(dataset *hdf5.Dataset, event TriggerParamsHDF5) {
 		panic(err)
 	}
 	fmt.Printf(":: dset.Write... [ok]\n")
+
+	dataspace.Close()
+	filespace.Close()
 }
 
 func writeWaveforms(dataset *hdf5.Dataset, data *[]int16) {
@@ -233,4 +239,7 @@ func writeWaveforms(dataset *hdf5.Dataset, data *[]int16) {
 		panic(err)
 	}
 	fmt.Printf(":: dset.Write... [ok]\n")
+
+	dataspace.Close()
+	filespace.Close()
 }

@@ -30,8 +30,8 @@ func NewWriter(config Configuration) *Writer {
 	writer.RDGroup, _ = createGroup(writer.File1, "RD")
 	writer.SensorsGroup, _ = createGroup(writer.File1, "Sensors")
 	writer.TriggerGroup, _ = createGroup(writer.File1, "Trigger")
-	writer.EventTable = createTable(writer.RDGroup, "events", EventDataHDF5{})
-	writer.RunInfoTable = createTable(writer.RDGroup, "runInfo", EventDataHDF5{})
+	writer.EventTable = createTable(writer.RunGroup, "events", EventDataHDF5{})
+	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", EventDataHDF5{})
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
 	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPmt", SensorMappingHDF5{})
 	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSipm", SensorMappingHDF5{})
@@ -78,7 +78,6 @@ func (w *Writer) WriteEvent(event *EventType) {
 	sipmSamples := len(event.SipmWaveforms[uint16(sipmSorted[0].channel)])
 
 	if !w.FirstEvt {
-		writeEntryToTable(w.EventTable, datatest)
 		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)})
 		writeArrayToTable(w.PmtMappingTable, &pmtSorted)
 		writeArrayToTable(w.SipmMappingTable, &sipmSorted)
@@ -89,6 +88,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 		w.FirstEvt = true
 	}
 	//writeTriggerConfig(w.TriggerParamsTable, triggerConfig)
+
+	writeEntryToTable(w.EventTable, datatest)
 
 	// Write waveforms
 	pmtData := make([]int16, npmts*pmtSamples)
