@@ -28,7 +28,7 @@ type TriggeData struct {
 	TrgChannels     []uint16
 }
 
-func ReadTriggerFEC(data []uint16) TriggeData {
+func ReadTriggerFEC(data []uint16, event *EventType) {
 	position := 0
 
 	for dbg := 0; dbg < 9; dbg++ {
@@ -121,7 +121,7 @@ func ReadTriggerFEC(data []uint16) TriggeData {
 	triggerLost1 = triggerLost1 | (uint32(data[position]) & 0x0FFFF)
 	position++
 
-	var trgInfo TriggeData
+	trgInfo := &event.TriggerConfig
 	trgInfo.TriggerType = triggerType
 	trgInfo.TriggerLost1 = triggerLost1
 	trgInfo.TriggerLost2 = triggerLost2
@@ -169,8 +169,6 @@ func ReadTriggerFEC(data []uint16) TriggeData {
 	fmt.Printf("trgInfo.TriggerIntN: %d\n", trgInfo.TriggerIntN)
 	fmt.Printf("trgInfo.TriggerExtN: %d\n", trgInfo.TriggerExtN)
 	fmt.Printf("trgInfo.TrgChannel: %v\n", trgInfo.TrgChannels)
-
-	return trgInfo
 }
 
 func CheckBit(mask uint16, pos uint16) bool {

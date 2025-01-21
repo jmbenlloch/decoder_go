@@ -102,3 +102,7 @@ type EquipmentHeaderStruct struct {
 	EquipmentTypeAttribute    EquipmentTypeAttributeType
 	EquipmentBasicElementSize EquipmentBasicElementSizeType
 }
+
+func EventIdGetNbInRun(id EventIdType) uint32 {
+	return id[0]
+}

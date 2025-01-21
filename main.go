@@ -18,6 +18,7 @@ var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 
 var huffmanCodesPmts *HuffmanNode
 var huffmanCodesSipms *HuffmanNode
+var sensorsMap *SensorsMap
 var dbConn *sqlx.DB
 var configuration Configuration
 
@@ -47,7 +48,7 @@ func main() {
 
 	evtCount := -1
 	for {
-		eventData, err := readEvent(file)
+		header, eventData, err := readEvent(file)
 		if err != nil {
 			break
 		}
@@ -58,10 +59,11 @@ func main() {
 		if evtCount < configuration.Skip {
 			continue
 		}
-		readGDC(eventData)
+		event := readGDC(eventData, header)
+		_ = event
 	}
 }
-func readEvent(file *os.File) ([]byte, error) {
+func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
 	fmt.Println("GDC Header size:", headerSize)
@@ -69,11 +71,11 @@ func readEvent(file *os.File) ([]byte, error) {
 	nRead, err := file.Read(headerBinary)
 	if err != nil {
 		fmt.Println("Error reading header:", err)
-		return nil, err
+		return header, nil, err
 	}
 	if nRead == 0 {
 		fmt.Println("End of file")
-		return nil, err
+		return header, nil, err
 	}
 
 	headerReader := bytes.NewReader(headerBinary)
@@ -85,14 +87,27 @@ func readEvent(file *os.File) ([]byte, error) {
 	payloadSize := uint32(header.EventSize) - uint32(headerSize)
 	eventData := make([]byte, payloadSize)
 	file.Read(eventData)
-	return eventData, nil
+	return header, eventData, nil
 }
 
-func readGDC(eventData []byte) {
+func readGDC(eventData []byte, header EventHeaderStruct) EventType {
+	event := EventType{
+		PmtWaveforms:  make(map[uint16][]int16),
+		SipmWaveforms: make(map[uint16][]int16),
+		Baselines:     make(map[uint16]uint16),
+	}
+	event.RunNumber = uint32(header.EventRunNb)
+	event.EventID = EventIdGetNbInRun(header.EventId)
+
+	// If we want to use the DB and the sensors map is not loaded, load it
+	if !configuration.NoDB && sensorsMap == nil {
+		event.SensorsMap = getSensorsFromDB(dbConn, int(header.EventRunNb))
+	}
+
 	// Read LDCs
 	position := 0
 	for {
-		nRead := readLDC(eventData, position)
+		nRead := readLDC(eventData, position, &event)
 		// Next LDC
 		position += nRead
 		fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
@@ -100,9 +115,10 @@ func readGDC(eventData []byte) {
 			break
 		}
 	}
+	return event
 }
 
-func readLDC(eventData []byte, position int) int {
+func readLDC(eventData []byte, position int, event *EventType) int {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
 	fmt.Println("LDC header size:", headerSize)
@@ -117,7 +133,7 @@ func readLDC(eventData []byte, position int) int {
 	startLDCPayload := position + int(header.EventHeadSize)
 	startPosition := 0
 	for {
-		nRead := readEquipment(eventData[startLDCPayload:], startPosition, header)
+		nRead := readEquipment(eventData[startLDCPayload:], startPosition, header, event)
 		// Next equipment
 		startPosition += nRead
 		if startPosition+int(header.EventHeadSize) >= int(header.EventSize) {
@@ -128,7 +144,7 @@ func readLDC(eventData []byte, position int) int {
 	return int(header.EventSize)
 }
 
-func readEquipment(eventData []byte, position int, header EventHeaderStruct) int {
+func readEquipment(eventData []byte, position int, header EventHeaderStruct, event *EventType) int {
 	var eqHeader EquipmentHeaderStruct
 	eqHeaderSize := unsafe.Sizeof(eqHeader)
 	fmt.Println("Equipment Header size:", eqHeaderSize)
@@ -171,6 +187,9 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct) int
 	fmt.Printf("\n")
 
 	evtFormat := ReadCommonHeader(payload)
+	// Set event timestamp. All subevents should be at the same time
+	// so we can use the timestamp from the any of them
+	event.Timestamp = evtFormat.Timestamp
 
 	switch evtFormat.FWVersion {
 	case 10:
@@ -179,17 +198,17 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct) int
 		case 0:
 			fmt.Println("PMT FEC")
 			if configuration.ReadPMTs {
-				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
 			}
 		case 1:
 			fmt.Println("SiPM FEC")
 			if configuration.ReadSiPMs {
-				ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header)
+				ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
 			}
 		case 2:
 			fmt.Println("Trigger FEC")
 			if configuration.ReadTrigger {
-				ReadTriggerFEC(payload[evtFormat.HeaderSize:])
+				ReadTriggerFEC(payload[evtFormat.HeaderSize:], event)
 			}
 		}
 	}

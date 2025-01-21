@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct) {
+func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct, event *EventType) {
 	position := 0
 	var time int = -1
 	var current_bit int = 31
@@ -46,7 +46,6 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 
 	// Map elecID -> last_value (for decompression)
 	//lastValues := make(map[uint16]int32)
-	waveforms := make(map[uint16][]int32)
 	//chMasks := make(map[uint16][]uint16)
 
 	// Reading the payload
@@ -54,12 +53,12 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 	var nextFThm int32 = -1
 
 	channelMask := pmtsChannelMask(evtFormat)
-	initializeWaveforms(waveforms, channelMask, bufferSamples)
+	initializeWaveforms(event.PmtWaveforms, channelMask, bufferSamples)
 
 	// Write pedestal
 	if Baseline {
-		baselines := writePmtPedestals(evtFormat, channelMask)
-		fmt.Println("Baselines: ", baselines)
+		fmt.Println("Baselines: ", event.Baselines)
+		writePmtPedestals(evtFormat, channelMask, event.Baselines)
 	}
 
 	//TODO maybe size of payload could be used here to stop, but the size is
@@ -78,7 +77,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 			if time == int(bufferSamples) {
 				break
 			}
-			position = decodeChargeIndiaPmtCompressed(data, position, waveforms,
+			position = decodeChargeIndiaPmtCompressed(data, position, event.PmtWaveforms,
 				&current_bit, huffmanCodesPmts, channelMask, uint32(time))
 		} else {
 			var FT int32 = int32(data[position]) & 0x0FFFF
@@ -92,7 +91,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 					break
 				}
 			}
-			position = decodeCharge(data, position, waveforms, channelMask, uint32(time))
+			position = decodeCharge(data, position, event.PmtWaveforms, channelMask, uint32(time))
 		}
 	}
 }
@@ -134,7 +133,7 @@ func computeNextFThm(nextFT *int32, nextFThm *int32, evtFormat *EventFormat) {
 	//}
 }
 
-func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms map[uint16][]int32,
+func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms map[uint16][]int16,
 	current_bit *int, huffman *HuffmanNode, channelMask []uint16, time uint32) int {
 	var dataword uint32 = 0
 
@@ -151,15 +150,15 @@ func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms map[u
 		dataword = binary.BigEndian.Uint32(dataU8)
 
 		// Get previous value
-		var previous int32 = 0
+		var previous int16 = 0
 		if time > 0 {
 			previous = waveforms[channelID][time-1]
 		}
 
 		var control_code int32 = 123456
-		wfvalue := decode_compressed_value(previous, dataword, control_code, current_bit, huffman)
+		wfvalue := int16(decode_compressed_value(int32(previous), dataword, control_code, current_bit, huffman))
 
-		fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x\n", channelID, time, wfvalue)
+		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x\n", channelID, time, wfvalue)
 
 		waveforms[channelID][time] = wfvalue
 	}
@@ -239,8 +238,7 @@ func computePmtElecID(fecID uint16, channel uint16, fwversion uint16) uint16 {
 	return elecID
 }
 
-func writePmtPedestals(evtFormat *EventFormat, channelMask []uint16) map[uint16]uint16 {
-	baselines := make(map[uint16]uint16, 6)
+func writePmtPedestals(evtFormat *EventFormat, channelMask []uint16, baselines map[uint16]uint16) {
 	for _, elecID := range channelMask {
 		// Only 6 baselines are sent per FEC
 		//  2 -> 0,2,4,6,8,10,12,14,16,18,20,22
@@ -258,5 +256,4 @@ func writePmtPedestals(evtFormat *EventFormat, channelMask []uint16) map[uint16]
 		baseline_index := (elecID % 12) / 2
 		baselines[elecID] = evtFormat.Baselines[baseline_index]
 	}
-	return baselines
 }

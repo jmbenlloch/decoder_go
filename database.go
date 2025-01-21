@@ -26,6 +26,11 @@ type HuffmanCode struct {
 	Code  string
 }
 
+type SensorMappingEntry struct {
+	ElecID   int `db:"ElecID"`
+	SensorID int `db:"SensorID"`
+}
+
 func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*HuffmanNode, error) {
 	var query string
 	switch sensor {
@@ -36,7 +41,6 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 		query = "SELECT value, code from HuffmanCodesPmt WHERE MinRun <= %d and MaxRun >= %d"
 		fmt.Println("PMTHuffman codes read from DB")
 	}
-	//	parse_huffman_line(std::stoi(row[0]), row[1], huffman);
 
 	query = fmt.Sprintf(query, runNumber, runNumber)
 	fmt.Println("Query: ", query)
@@ -59,4 +63,48 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 	}
 	printfHuffman(huffman, 1)
 	return huffman, nil
+}
+
+func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
+	query := "SELECT ElecID, SensorID FROM ChannelMapping WHERE MinRun <= %d and MaxRun >= %d ORDER BY SensorID"
+	query = fmt.Sprintf(query, runNumber, runNumber)
+	fmt.Println("Query: ", query)
+	fmt.Println("SiPM Huffman codes read from DB")
+
+	rows, err := db.Queryx(query)
+	if err != nil {
+		fmt.Println("Error querying database: ", err)
+	}
+
+	npmts := 0
+	nsipms := 0
+	threshold := 999
+	sensorsMap := SensorsMap{
+		Pmts: SensorMapping{
+			ToElecID:   make(map[uint16]uint16),
+			ToSensorID: make(map[uint16]uint16),
+		},
+		Sipms: SensorMapping{
+			ToElecID:   make(map[uint16]uint16),
+			ToSensorID: make(map[uint16]uint16),
+		},
+	}
+
+	for rows.Next() {
+		result := SensorMappingEntry{}
+		err := rows.StructScan(&result)
+		if err != nil {
+			fmt.Println("Error scanning DB row:", err)
+		}
+		if result.ElecID < threshold {
+			npmts += 1
+			sensorsMap.Pmts.ToElecID[uint16(result.SensorID)] = uint16(result.ElecID)
+			sensorsMap.Pmts.ToSensorID[uint16(result.ElecID)] = uint16(result.SensorID)
+		} else {
+			nsipms += 1
+			sensorsMap.Sipms.ToElecID[uint16(result.SensorID)] = uint16(result.ElecID)
+			sensorsMap.Sipms.ToSensorID[uint16(result.ElecID)] = uint16(result.SensorID)
+		}
+	}
+	return sensorsMap
 }
