@@ -17,6 +17,10 @@ type EventDataHDF5 struct {
 	timestamp  uint64
 }
 
+type RunInfoHDF5 struct {
+	run_number int32
+}
+
 type TriggerParamsHDF5 struct {
 	param string
 	value int32

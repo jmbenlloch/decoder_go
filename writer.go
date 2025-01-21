@@ -9,11 +9,13 @@ import (
 type Writer struct {
 	File1              *hdf5.File
 	File2              *hdf5.File
+	FirstEvt           bool
 	RunGroup           *hdf5.Group
 	RDGroup            *hdf5.Group
 	SensorsGroup       *hdf5.Group
 	TriggerGroup       *hdf5.Group
 	EventTable         *hdf5.Dataset
+	RunInfoTable       *hdf5.Dataset
 	TriggerParamsTable *hdf5.Dataset
 	PmtMappingTable    *hdf5.Dataset
 	SipmMappingTable   *hdf5.Dataset
@@ -27,6 +29,7 @@ func NewWriter(config Configuration) *Writer {
 	writer.SensorsGroup, _ = createGroup(writer.File1, "Sensors")
 	writer.TriggerGroup, _ = createGroup(writer.File1, "Trigger")
 	writer.EventTable = createTable(writer.RDGroup, "events", EventDataHDF5{})
+	writer.RunInfoTable = createTable(writer.RDGroup, "runInfo", EventDataHDF5{})
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
 	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPmt", SensorMappingHDF5{})
 	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSipm", SensorMappingHDF5{})
@@ -63,17 +66,24 @@ func (w *Writer) WriteEvent(event *EventType) {
 	//	param: "test",
 	//	value: 1,
 	//}
-	writeEntryToTable(w.EventTable, datatest)
-	//writeTriggerConfig(w.TriggerParamsTable, triggerConfig)
 
 	pmtSorted := sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
 	sipmSorted := sortSensorsBySensorID(event.SensorsMap.Sipms.ToSensorID)
-	writeArrayToTable(w.PmtMappingTable, &pmtSorted)
-	writeArrayToTable(w.SipmMappingTable, &sipmSorted)
+
+	if !w.FirstEvt {
+		writeEntryToTable(w.EventTable, datatest)
+		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)})
+		writeArrayToTable(w.PmtMappingTable, &pmtSorted)
+		writeArrayToTable(w.SipmMappingTable, &sipmSorted)
+		w.FirstEvt = true
+	}
+	//writeTriggerConfig(w.TriggerParamsTable, triggerConfig)
+
 }
 
 func (w *Writer) Close() {
 	w.EventTable.Close()
+	w.RunInfoTable.Close()
 	w.PmtMappingTable.Close()
 	w.SipmMappingTable.Close()
 	w.TriggerParamsTable.Close()
