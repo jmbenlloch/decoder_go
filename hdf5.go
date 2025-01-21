@@ -6,12 +6,6 @@ import (
 	"github.com/jmbenlloch/go-hdf5"
 )
 
-type WriterData struct {
-	file    *hdf5.File
-	data    *hdf5.Dataset
-	charges *hdf5.Dataset
-}
-
 type EventDataHDF5 struct {
 	evt_number int32
 	timestamp  uint64
@@ -48,50 +42,48 @@ func createGroup(file *hdf5.File, groupName string) (*hdf5.Group, error) {
 	return g, err
 }
 
-//	func createChargesArray(file *hdf5.File) *hdf5.Dataset {
-//		const nCharges = 32
-//		dimsArray := []uint{0, 0}
-//		unlimitedDims := -1 // H5S_UNLIMITED is -1L
-//		maxDimsArray := []uint{uint(unlimitedDims), nCharges}
-//		file_spaceArray, err := hdf5.CreateSimpleDataspace(dimsArray, maxDimsArray)
-//		if err != nil {
-//			panic(err)
-//		}
-//
-//		// create property list
-//		plistArray, err := hdf5.NewPropList(hdf5.P_DATASET_CREATE)
-//		if err != nil {
-//			fmt.Println("plist")
-//			panic(err)
-//		}
-//		chunksArray := []uint{32768, nCharges}
-//		plistArray.SetChunk(chunksArray)
-//		// Set compression level
-//		plistArray.SetDeflate(4)
-//
-//		// create the memory data type
-//		dtypeArray, err := hdf5.NewDatatypeFromValue(int16(7))
-//		fmt.Println(dtypeArray)
-//		if err != nil {
-//			fmt.Println("datatype")
-//			panic("could not create a dtype")
-//		}
-//
-//		// create the dataset
-//		dsnameArray := "charges"
-//		//dsetArray, err := f.CreateDatasetWith(dsnameArray, dtypeArray, file_spaceArray, plistArray)
-//		dsetArray, err := file.CreateDatasetWith(dsnameArray, hdf5.T_NATIVE_INT16, file_spaceArray, plistArray)
-//		if err != nil {
-//			fmt.Println("dataset")
-//			fmt.Println(err)
-//			panic(err)
-//		}
-//
-//		dimsGot, maxdimsGot, err := dsetArray.Space().SimpleExtentDims()
-//		fmt.Println("1-Size array: ", dimsGot, maxdimsGot)
-//
-//		return dsetArray
-//	}
+func createWaveformsArray(group *hdf5.Group, name string, nSensors int, nSamples int) *hdf5.Dataset {
+	dimsArray := []uint{0, 0, 0}
+	unlimitedDims := -1 // H5S_UNLIMITED is -1L
+	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors), uint(nSamples)}
+	file_spaceArray, err := hdf5.CreateSimpleDataspace(dimsArray, maxDimsArray)
+	if err != nil {
+		panic(err)
+	}
+
+	// create property list
+	plistArray, err := hdf5.NewPropList(hdf5.P_DATASET_CREATE)
+	if err != nil {
+		fmt.Println("plist")
+		panic(err)
+	}
+
+	chunksArray := []uint{1, 50, 32768}
+	plistArray.SetChunk(chunksArray)
+	// Set compression level
+	plistArray.SetDeflate(4)
+
+	// create the memory data type
+	dtypeArray, err := hdf5.NewDatatypeFromValue(int16(7))
+	fmt.Println(dtypeArray)
+	if err != nil {
+		fmt.Println("datatype")
+		panic("could not create a dtype")
+	}
+
+	// create the dataset
+	dsetArray, err := group.CreateDatasetWith(name, hdf5.T_NATIVE_INT16, file_spaceArray, plistArray)
+	if err != nil {
+		fmt.Println("dataset")
+		fmt.Println(err)
+		panic(err)
+	}
+
+	dimsGot, maxdimsGot, err := dsetArray.Space().SimpleExtentDims()
+	fmt.Println("1-Size array: ", dimsGot, maxdimsGot)
+
+	return dsetArray
+}
 
 func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dataset {
 	dims := []uint{0}
@@ -207,52 +199,38 @@ func writeTriggerConfig(dataset *hdf5.Dataset, event TriggerParamsHDF5) {
 	fmt.Printf(":: dset.Write... [ok]\n")
 }
 
-//func writeCharges(dataset *hdf5.Dataset, events *[]EventData) {
-//	//	charges := [2][32]int16{
-//	//		{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2},
-//	//		{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2},
-//	//	}
-//	const nCharges = 32
-//	length := uint(len(*events))
-//	charges := make([][32]uint16, length)
-//	//fmt.Println(charges)
-//
-//	for evt := 0; evt < int(length); evt++ {
-//		for sensor := 0; sensor < nCharges; sensor++ {
-//			charges[evt][sensor] = (*events)[evt].Charges[sensor]
-//		}
-//	}
-//
-//	dims := []uint{length, nCharges}
-//	dataspace, err := hdf5.CreateSimpleDataspace(dims, nil)
-//	if err != nil {
-//		fmt.Println("space")
-//		panic(err)
-//	}
-//
-//	// extend
-//	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
-//	eventsInFile := dimsGot[0]
-//	fmt.Println("2-Size array: ", dimsGot, maxdimsGot)
-//	newsize := []uint{eventsInFile + length, nCharges}
-//	dataset.Resize(newsize)
-//	filespace := dataset.Space()
-//	fmt.Println(filespace)
-//
-//	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
-//	fmt.Println("3-Size array: ", dimsGot, maxdimsGot)
-//
-//	start := []uint{eventsInFile, 0}
-//	count := []uint{length, nCharges}
-//	filespace.SelectHyperslab(start, nil, count, nil)
-//
-//	// write data to the dataset
-//	fmt.Printf(":: dset.Write...\n")
-//	//err = dsetArray.Write(&charges)
-//	err = dataset.WriteSubset(&charges, dataspace, filespace)
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Printf(":: dset.Write... [ok]\n")
-//}
-//
+func writeWaveforms(dataset *hdf5.Dataset, data *[]int16) {
+	// extend
+	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
+	eventsInFile := dimsGot[0]
+	nSensors := maxdimsGot[1]
+	nSamples := maxdimsGot[2]
+	fmt.Println("2-Size array: ", dimsGot, maxdimsGot)
+	newsize := []uint{eventsInFile + 1, nSensors, nSamples}
+	dataset.Resize(newsize)
+	filespace := dataset.Space()
+	fmt.Println(filespace)
+
+	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
+	fmt.Println("3-Size array: ", dimsGot, maxdimsGot)
+
+	start := []uint{eventsInFile, 0, 0}
+	count := []uint{1, nSensors, nSamples}
+	filespace.SelectHyperslab(start, nil, count, nil)
+
+	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
+	if err != nil {
+		fmt.Println("space")
+		panic(err)
+	}
+
+	// write data to the dataset
+	fmt.Printf(":: dset.Write...\n")
+	//err = dsetArray.Write(&charges)
+	//err = dataset.WriteSubset(data, dataspace, filespace)
+	err = dataset.WriteSubset(data, dataspace, filespace)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf(":: dset.Write... [ok]\n")
+}

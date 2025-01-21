@@ -19,6 +19,8 @@ type Writer struct {
 	TriggerParamsTable *hdf5.Dataset
 	PmtMappingTable    *hdf5.Dataset
 	SipmMappingTable   *hdf5.Dataset
+	PmtWaveforms       *hdf5.Dataset
+	SipmWaveforms      *hdf5.Dataset
 }
 
 func NewWriter(config Configuration) *Writer {
@@ -70,20 +72,52 @@ func (w *Writer) WriteEvent(event *EventType) {
 	pmtSorted := sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
 	sipmSorted := sortSensorsBySensorID(event.SensorsMap.Sipms.ToSensorID)
 
+	npmts := len(pmtSorted)
+	nsipms := len(sipmSorted)
+	pmtSamples := len(event.PmtWaveforms[uint16(pmtSorted[0].channel)])
+	sipmSamples := len(event.SipmWaveforms[uint16(sipmSorted[0].channel)])
+
 	if !w.FirstEvt {
 		writeEntryToTable(w.EventTable, datatest)
 		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)})
 		writeArrayToTable(w.PmtMappingTable, &pmtSorted)
 		writeArrayToTable(w.SipmMappingTable, &sipmSorted)
+
+		w.PmtWaveforms = createWaveformsArray(w.RDGroup, "pmtrwf", npmts, pmtSamples)
+		w.SipmWaveforms = createWaveformsArray(w.RDGroup, "sipmrwf", nsipms, sipmSamples)
+
 		w.FirstEvt = true
 	}
 	//writeTriggerConfig(w.TriggerParamsTable, triggerConfig)
+
+	// Write waveforms
+	pmtData := make([]int16, npmts*pmtSamples)
+	for i, sensor := range pmtSorted {
+		for j, sample := range event.PmtWaveforms[uint16(sensor.channel)] {
+			pmtData[i*pmtSamples+j] = int16(sample)
+		}
+	}
+	writeWaveforms(w.PmtWaveforms, &pmtData)
+
+	sipmData := make([]int16, nsipms*sipmSamples)
+	for i, sensor := range sipmSorted {
+		for j, sample := range event.SipmWaveforms[uint16(sensor.channel)] {
+			sipmData[i*sipmSamples+j] = int16(sample)
+		}
+	}
+	writeWaveforms(w.SipmWaveforms, &sipmData)
 
 }
 
 func (w *Writer) Close() {
 	w.EventTable.Close()
 	w.RunInfoTable.Close()
+	if w.PmtWaveforms != nil {
+		w.PmtWaveforms.Close()
+	}
+	if w.SipmWaveforms != nil {
+		w.SipmWaveforms.Close()
+	}
 	w.PmtMappingTable.Close()
 	w.SipmMappingTable.Close()
 	w.TriggerParamsTable.Close()
