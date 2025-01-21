@@ -17,6 +17,9 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 			bufferSamples = evtFormat.BufferSamples2
 		}
 	}
+	// SiPMs are sampled at 1 MHz, while PMTs are sampled at 40 MHz
+	// The buffer samples parameter from the headers is for PMTs
+	bufferSamples = bufferSamples / 40
 
 	if huffmanCodesSipms == nil {
 		var err error
