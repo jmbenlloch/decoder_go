@@ -10,8 +10,7 @@ import (
 )
 
 type Writer struct {
-	File1              *hdf5.File
-	File2              *hdf5.File
+	File               *hdf5.File
 	FirstEvt           bool
 	RunGroup           *hdf5.Group
 	RDGroup            *hdf5.Group
@@ -35,16 +34,16 @@ type Writer struct {
 
 const N_TRG_CH = 64
 
-func NewWriter(config Configuration) *Writer {
+func NewWriter(filename string) *Writer {
 	// Set string size for HDF5
 	hdf5.SetStringLength(STRLEN)
 
 	writer := &Writer{}
-	writer.File1 = openFile(configuration.FileOut)
-	writer.RunGroup, _ = createGroup(writer.File1, "Run")
-	writer.RDGroup, _ = createGroup(writer.File1, "RD")
-	writer.SensorsGroup, _ = createGroup(writer.File1, "Sensors")
-	writer.TriggerGroup, _ = createGroup(writer.File1, "Trigger")
+	writer.File = openFile(filename)
+	writer.RunGroup, _ = createGroup(writer.File, "Run")
+	writer.RDGroup, _ = createGroup(writer.File, "RD")
+	writer.SensorsGroup, _ = createGroup(writer.File, "Sensors")
+	writer.TriggerGroup, _ = createGroup(writer.File, "Trigger")
 	writer.EventTable = createTable(writer.RunGroup, "events", EventDataHDF5{})
 	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", RunInfoHDF5{})
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
@@ -275,8 +274,7 @@ func (w *Writer) Close() {
 	w.RDGroup.Close()
 	w.SensorsGroup.Close()
 	w.TriggerGroup.Close()
-	w.File1.Close()
-	//w.File2.Close()
+	w.File.Close()
 }
 
 func (w *Writer) writeTriggerConfiguration(params TriggerData) {

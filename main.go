@@ -46,7 +46,12 @@ func main() {
 	}
 	defer file.Close()
 
-	writer := NewWriter(configuration)
+	var writer, writer2 *Writer
+	writer = NewWriter(configuration.FileOut)
+	if configuration.SplitTrg {
+		writer2 = NewWriter(configuration.FileOut2)
+		defer writer2.Close()
+	}
 	defer writer.Close()
 
 	evtCount := -1
@@ -63,7 +68,17 @@ func main() {
 			continue
 		}
 		event := readGDC(eventData, header)
-		writer.WriteEvent(&event)
+
+		if configuration.SplitTrg {
+			switch int(event.TriggerType) {
+			case configuration.TrgCode1:
+				writer.WriteEvent(&event)
+			case configuration.TrgCode2:
+				writer2.WriteEvent(&event)
+			}
+		} else {
+			writer.WriteEvent(&event)
+		}
 	}
 }
 func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
