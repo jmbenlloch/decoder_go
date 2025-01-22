@@ -26,6 +26,7 @@ type Writer struct {
 	PmtMappingTable    *hdf5.Dataset
 	SipmMappingTable   *hdf5.Dataset
 	PmtWaveforms       *hdf5.Dataset
+	ExtTrgWaveform     *hdf5.Dataset
 	SipmWaveforms      *hdf5.Dataset
 	Baselines          *hdf5.Dataset
 }
@@ -153,6 +154,11 @@ func (w *Writer) WriteEvent(event *EventType) {
 			w.SipmWaveforms = create3dArray(w.RDGroup, "sipmrwf", nSipms, sipmSamples)
 		}
 
+		if event.ExtTrgWaveform != nil {
+			samples := len(*event.ExtTrgWaveform)
+			w.ExtTrgWaveform = create2dArray(w.RDGroup, "ext_pmt", samples)
+		}
+
 		w.FirstEvt = true
 	}
 
@@ -165,6 +171,9 @@ func (w *Writer) WriteEvent(event *EventType) {
 	}
 	if nSipms > 0 {
 		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, nSipms, sipmSamples)
+	}
+	if event.ExtTrgWaveform != nil {
+		writeExtTrigger(w.ExtTrgWaveform, event.ExtTrgWaveform)
 	}
 
 	trgChannels := make([]int16, N_TRG_CH)
@@ -195,6 +204,14 @@ func writeWaveforms(dset *hdf5.Dataset, waveforms map[uint16][]int16,
 	write3dArray(dset, &data)
 }
 
+func writeExtTrigger(dset *hdf5.Dataset, waveform *[]int16) {
+	data := make([]int16, len(*waveform))
+	for i, value := range *waveform {
+		data[i] = value
+	}
+	write2dArray(dset, &data)
+}
+
 func writeBaselines(dset *hdf5.Dataset, baselines map[uint16]uint16,
 	order []SensorMappingHDF5, nSensors int) {
 	data := make([]int16, nSensors)
@@ -221,6 +238,9 @@ func (w *Writer) Close() {
 	}
 	if w.SipmWaveforms != nil {
 		w.SipmWaveforms.Close()
+	}
+	if w.ExtTrgWaveform != nil {
+		w.ExtTrgWaveform.Close()
 	}
 	w.PmtMappingTable.Close()
 	w.SipmMappingTable.Close()

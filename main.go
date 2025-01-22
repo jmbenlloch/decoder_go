@@ -118,7 +118,20 @@ func readGDC(eventData []byte, header EventHeaderStruct) EventType {
 			break
 		}
 	}
+
+	processPmtIds(&event, configuration)
 	return event
+}
+
+func processPmtIds(event *EventType, configuration Configuration) {
+	extTriggerCh := configuration.ExtTrigger
+	for elecID, waveform := range event.PmtWaveforms {
+		if elecID == uint16(extTriggerCh) {
+			event.ExtTrgWaveform = &waveform
+			delete(event.PmtWaveforms, elecID)
+			delete(event.Baselines, elecID)
+		}
+	}
 }
 
 func readLDC(eventData []byte, position int, event *EventType) int {

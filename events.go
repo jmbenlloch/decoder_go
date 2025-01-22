@@ -12,7 +12,8 @@ type EventType struct {
 	TriggerConfig TriggerData
 	// Trigger type is not written correctly in the trigger FEC
 	// the value has to be retrieved from the NEXT headers from PMT or SiPM
-	TriggerType uint16
+	TriggerType    uint16
+	ExtTrgWaveform *[]int16
 }
 
 type SensorsMap struct {
