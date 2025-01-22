@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	hdf5 "github.com/jmbenlloch/go-hdf5"
+	"golang.org/x/exp/maps"
 )
 
 type Writer struct {
@@ -73,6 +74,28 @@ func sortSensorsBySensorID(sensorsFromElecIDToSensorID map[uint16]uint16) []Sens
 	return sorted
 }
 
+func sortSensorsByElecID(sensors map[uint16][]int16) []SensorMappingHDF5 {
+	// The array MUST be allocated at creation, if not, HDF5 will panic
+	// doing appends will not work
+	nSensors := len(sensors)
+	sorted := make([]SensorMappingHDF5, nSensors)
+	count := 0
+	for elecID, _ := range sensors {
+		sensor := SensorMappingHDF5{
+			channel:  int32(elecID),
+			sensorID: -1,
+		}
+		sorted[count] = sensor
+		count++
+	}
+
+	// Sort by sensorID
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].channel < sorted[j].channel
+	})
+	return sorted
+}
+
 func (w *Writer) WriteEvent(event *EventType) {
 	// Write event data
 	datatest := EventDataHDF5{
@@ -89,13 +112,31 @@ func (w *Writer) WriteEvent(event *EventType) {
 		trigger_type: event.TriggerType,
 	})
 
-	pmtSorted := sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
-	sipmSorted := sortSensorsBySensorID(event.SensorsMap.Sipms.ToSensorID)
+	var pmtSorted, sipmSorted []SensorMappingHDF5
+	var nPmts, nSipms int
+	var pmtSamples, sipmSamples int
 
-	npmts := len(pmtSorted)
-	nsipms := len(sipmSorted)
-	pmtSamples := len(event.PmtWaveforms[uint16(pmtSorted[0].channel)])
-	sipmSamples := len(event.SipmWaveforms[uint16(sipmSorted[0].channel)])
+	if configuration.NoDB {
+		pmtSorted = sortSensorsByElecID(event.PmtWaveforms)
+		sipmSorted = sortSensorsByElecID(event.SipmWaveforms)
+		nPmts = len(event.PmtWaveforms)
+		nSipms = len(event.SipmWaveforms)
+	} else {
+		pmtSorted = sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
+		sipmSorted = sortSensorsBySensorID(event.SensorsMap.Sipms.ToSensorID)
+		nPmts = len(pmtSorted)
+		nSipms = len(sipmSorted)
+	}
+
+	if nPmts > 0 {
+		randomPmt := maps.Values(event.PmtWaveforms)[0]
+		pmtSamples = len(randomPmt)
+	}
+
+	if nSipms > 0 {
+		randomSipm := maps.Values(event.SipmWaveforms)[0]
+		sipmSamples = len(randomSipm)
+	}
 
 	if !w.FirstEvt {
 		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)})
@@ -104,9 +145,13 @@ func (w *Writer) WriteEvent(event *EventType) {
 
 		w.writeTriggerConfiguration(event.TriggerConfig)
 
-		w.SipmWaveforms = createWaveformsArray(w.RDGroup, "sipmrwf", nsipms, sipmSamples)
-		w.PmtWaveforms = createWaveformsArray(w.RDGroup, "pmtrwf", npmts, pmtSamples)
-		w.Baselines = create2dArray(w.RDGroup, "pmt_baselines", npmts)
+		if nPmts > 0 {
+			w.PmtWaveforms = create3dArray(w.RDGroup, "pmtrwf", nPmts, pmtSamples)
+			w.Baselines = create2dArray(w.RDGroup, "pmt_baselines", nPmts)
+		}
+		if nSipms > 0 {
+			w.SipmWaveforms = create3dArray(w.RDGroup, "sipmrwf", nSipms, sipmSamples)
+		}
 
 		w.FirstEvt = true
 	}
@@ -114,27 +159,13 @@ func (w *Writer) WriteEvent(event *EventType) {
 	writeEntryToTable(w.EventTable, datatest)
 
 	// Write waveforms
-	pmtData := make([]int16, npmts*pmtSamples)
-	for i, sensor := range pmtSorted {
-		for j, sample := range event.PmtWaveforms[uint16(sensor.channel)] {
-			pmtData[i*pmtSamples+j] = int16(sample)
-		}
+	if nPmts > 0 {
+		writeWaveforms(w.PmtWaveforms, event.PmtWaveforms, pmtSorted, nPmts, pmtSamples)
+		writeBaselines(w.Baselines, event.Baselines, pmtSorted, nPmts)
 	}
-	writeWaveforms(w.PmtWaveforms, &pmtData)
-
-	sipmData := make([]int16, nsipms*sipmSamples)
-	for i, sensor := range sipmSorted {
-		for j, sample := range event.SipmWaveforms[uint16(sensor.channel)] {
-			sipmData[i*sipmSamples+j] = int16(sample)
-		}
+	if nSipms > 0 {
+		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, nSipms, sipmSamples)
 	}
-	writeWaveforms(w.SipmWaveforms, &sipmData)
-
-	baselines := make([]int16, npmts)
-	for i, sensor := range pmtSorted {
-		baselines[i] = int16(event.Baselines[uint16(sensor.channel)])
-	}
-	write2dArray(w.Baselines, &baselines)
 
 	trgChannels := make([]int16, N_TRG_CH)
 	for _, sensor := range event.TriggerConfig.TrgChannels {
@@ -146,6 +177,37 @@ func (w *Writer) WriteEvent(event *EventType) {
 	}
 	write2dArray(w.TriggerChannels, &trgChannels)
 
+}
+
+func writeWaveforms(dset *hdf5.Dataset, waveforms map[uint16][]int16,
+	order []SensorMappingHDF5, nSensors int, nSamples int) {
+	data := make([]int16, nSensors*nSamples)
+	for i, sensor := range order {
+		// Write only if the corresponding sensor has data
+		// if not, the data array will be filled with zeros for that sensor
+		if _, ok := waveforms[uint16(sensor.channel)]; !ok {
+			continue
+		}
+		for j, sample := range waveforms[uint16(sensor.channel)] {
+			data[i*nSamples+j] = int16(sample)
+		}
+	}
+	write3dArray(dset, &data)
+}
+
+func writeBaselines(dset *hdf5.Dataset, baselines map[uint16]uint16,
+	order []SensorMappingHDF5, nSensors int) {
+	data := make([]int16, nSensors)
+	for i, sensor := range order {
+		// Write only if the corresponding sensor has data
+		// if not, the baseline will be zero
+		if _, ok := baselines[uint16(sensor.channel)]; !ok {
+			fmt.Println("Baseline not found for sensor ", sensor)
+			continue
+		}
+		data[i] = int16(baselines[uint16(sensor.channel)])
+	}
+	write2dArray(dset, &data)
 }
 
 func (w *Writer) Close() {

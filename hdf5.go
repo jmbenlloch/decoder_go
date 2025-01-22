@@ -59,7 +59,7 @@ func createGroup(file *hdf5.File, groupName string) (*hdf5.Group, error) {
 	return g, err
 }
 
-func createWaveformsArray(group *hdf5.Group, name string, nSensors int, nSamples int) *hdf5.Dataset {
+func create3dArray(group *hdf5.Group, name string, nSensors int, nSamples int) *hdf5.Dataset {
 	dimsArray := []uint{0, 0, 0}
 	unlimitedDims := -1 // H5S_UNLIMITED is -1L
 	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors), uint(nSamples)}
@@ -201,7 +201,7 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
 	filespace.Close()
 }
 
-func writeWaveforms(dataset *hdf5.Dataset, data *[]int16) {
+func write3dArray(dataset *hdf5.Dataset, data *[]int16) {
 	// extend
 	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
 	eventsInFile := dimsGot[0]
