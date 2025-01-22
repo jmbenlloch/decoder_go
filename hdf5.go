@@ -16,6 +16,10 @@ type TriggerLostHDF5 struct {
 	triggerLost2 int32
 }
 
+type TriggerTypeHDF5 struct {
+	trigger_type uint16
+}
+
 type RunInfoHDF5 struct {
 	run_number int32
 }
@@ -66,7 +70,7 @@ func createWaveformsArray(group *hdf5.Group, name string, nSensors int, nSamples
 	return dataset
 }
 
-func createBaselinesArray(group *hdf5.Group, name string, nSensors int) *hdf5.Dataset {
+func create2dArray(group *hdf5.Group, name string, nSensors int) *hdf5.Dataset {
 	dimsArray := []uint{0, 0}
 	unlimitedDims := -1 // H5S_UNLIMITED is -1L
 	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors)}
@@ -236,7 +240,7 @@ func writeWaveforms(dataset *hdf5.Dataset, data *[]int16) {
 	filespace.Close()
 }
 
-func writeBaselines(dataset *hdf5.Dataset, data *[]int16) {
+func write2dArray(dataset *hdf5.Dataset, data *[]int16) {
 	// extend
 	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
 	eventsInFile := dimsGot[0]

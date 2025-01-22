@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 
@@ -18,13 +19,17 @@ type Writer struct {
 	EventTable         *hdf5.Dataset
 	RunInfoTable       *hdf5.Dataset
 	TriggerParamsTable *hdf5.Dataset
+	TriggerTypeTable   *hdf5.Dataset
+	TriggerLostTable   *hdf5.Dataset
+	TriggerChannels    *hdf5.Dataset
 	PmtMappingTable    *hdf5.Dataset
 	SipmMappingTable   *hdf5.Dataset
 	PmtWaveforms       *hdf5.Dataset
 	SipmWaveforms      *hdf5.Dataset
 	Baselines          *hdf5.Dataset
-	TriggerLost        *hdf5.Dataset
 }
+
+const N_TRG_CH = 64
 
 func NewWriter(config Configuration) *Writer {
 	// Set string size for HDF5
@@ -39,7 +44,9 @@ func NewWriter(config Configuration) *Writer {
 	writer.EventTable = createTable(writer.RunGroup, "events", EventDataHDF5{})
 	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", RunInfoHDF5{})
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
-	writer.TriggerLost = createTable(writer.TriggerGroup, "triggerLost", TriggerLostHDF5{})
+	writer.TriggerLostTable = createTable(writer.TriggerGroup, "triggerLost", TriggerLostHDF5{})
+	writer.TriggerTypeTable = createTable(writer.TriggerGroup, "trigger", TriggerTypeHDF5{})
+	writer.TriggerChannels = create2dArray(writer.TriggerGroup, "events", N_TRG_CH)
 	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPmt", SensorMappingHDF5{})
 	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSipm", SensorMappingHDF5{})
 	return writer
@@ -73,9 +80,13 @@ func (w *Writer) WriteEvent(event *EventType) {
 		evt_number: int32(event.EventID),
 	}
 
-	writeEntryToTable(w.TriggerLost, TriggerLostHDF5{
+	writeEntryToTable(w.TriggerLostTable, TriggerLostHDF5{
 		triggerLost1: int32(event.TriggerConfig.TriggerLost1),
 		triggerLost2: int32(event.TriggerConfig.TriggerLost2),
+	})
+
+	writeEntryToTable(w.TriggerTypeTable, TriggerTypeHDF5{
+		trigger_type: event.TriggerType,
 	})
 
 	pmtSorted := sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
@@ -95,7 +106,7 @@ func (w *Writer) WriteEvent(event *EventType) {
 
 		w.SipmWaveforms = createWaveformsArray(w.RDGroup, "sipmrwf", nsipms, sipmSamples)
 		w.PmtWaveforms = createWaveformsArray(w.RDGroup, "pmtrwf", npmts, pmtSamples)
-		w.Baselines = createBaselinesArray(w.RDGroup, "pmt_baselines", npmts)
+		w.Baselines = create2dArray(w.RDGroup, "pmt_baselines", npmts)
 
 		w.FirstEvt = true
 	}
@@ -123,7 +134,17 @@ func (w *Writer) WriteEvent(event *EventType) {
 	for i, sensor := range pmtSorted {
 		baselines[i] = int16(event.Baselines[uint16(sensor.channel)])
 	}
-	writeBaselines(w.Baselines, &baselines)
+	write2dArray(w.Baselines, &baselines)
+
+	trgChannels := make([]int16, N_TRG_CH)
+	for _, sensor := range event.TriggerConfig.TrgChannels {
+		if sensor < N_TRG_CH {
+			trgChannels[sensor] = 1
+		} else {
+			fmt.Println("Trigger channel out of range: ", sensor)
+		}
+	}
+	write2dArray(w.TriggerChannels, &trgChannels)
 
 }
 
@@ -144,7 +165,9 @@ func (w *Writer) Close() {
 	if w.TriggerParamsTable != nil {
 		w.TriggerParamsTable.Close()
 	}
-	w.TriggerLost.Close()
+	w.TriggerLostTable.Close()
+	w.TriggerTypeTable.Close()
+	w.TriggerChannels.Close()
 	w.RunGroup.Close()
 	w.RDGroup.Close()
 	w.SensorsGroup.Close()

@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type TriggerData struct {
 	TriggerType     uint16   `hdf5:"triggerType"`
@@ -35,10 +37,10 @@ func ReadTriggerFEC(data []uint16, event *EventType) {
 		fmt.Printf("TrgConf[%d] = 0x%04x\n", dbg, data[dbg])
 	}
 	for dbg := 0; dbg < 4; dbg++ {
-		fmt.Printf("Ch info[%d] = 0x%04x\n", dbg, data[dbg+6])
+		fmt.Printf("Ch info[%d] = 0x%04x\n", dbg, data[dbg+9])
 	}
 	for dbg := 0; dbg < 4; dbg++ {
-		fmt.Printf("Trigger lost[%d] = 0x%04x\n", dbg, data[dbg+12])
+		fmt.Printf("Trigger lost[%d] = 0x%04x\n", dbg, data[dbg+13])
 	}
 
 	//TRG conf 8

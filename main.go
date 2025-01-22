@@ -193,6 +193,8 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 	// Set event timestamp. All subevents should be at the same time
 	// so we can use the timestamp from the any of them
 	event.Timestamp = evtFormat.Timestamp
+	// Set trigger type. All subevents should have the same trigger type
+	event.TriggerType = evtFormat.TriggerType
 
 	switch evtFormat.FWVersion {
 	case 10:

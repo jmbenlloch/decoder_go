@@ -9,7 +9,6 @@ type Configuration struct {
 	MaxEvents   int    `json:"max_events"`
 	Verbosity   int    `json:"verbosity"`
 	ExtTrigger  int    `json:"ext_trigger"`
-	TwoFiles    bool   `json:"two_files"`
 	FileIn      string `json:"file_in"`
 	FileOut     string `json:"file_out"`
 	FileOut2    string `json:"file_out2"`
@@ -35,7 +34,6 @@ func LoadConfiguration(filename string) (Configuration, error) {
 	config.MaxEvents = 1000000000
 	config.Verbosity = 0
 	config.ExtTrigger = 15
-	config.TwoFiles = false
 	config.TrgCode1 = 1
 	config.TrgCode2 = 9
 	config.ReadPMTs = true
