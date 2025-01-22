@@ -11,18 +11,31 @@ type EventDataHDF5 struct {
 	timestamp  uint64
 }
 
+type TriggerLostHDF5 struct {
+	triggerLost1 int32
+	triggerLost2 int32
+}
+
 type RunInfoHDF5 struct {
 	run_number int32
 }
 
 type TriggerParamsHDF5 struct {
-	param string
-	value int32
+	paramStr [STRLEN]byte
+	value    int32
 }
 
 type SensorMappingHDF5 struct {
 	channel  int32
 	sensorID int32
+}
+
+const STRLEN = 20
+
+func convertToHdf5String(s string) [STRLEN]byte {
+	var byteArray [STRLEN]byte
+	copy(byteArray[:], s)
+	return byteArray
 }
 
 func openFile(fname string) *hdf5.File {
@@ -174,45 +187,6 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
 	fmt.Printf(":: dset.Write...\n")
 	//err = dset.Write(&s2)
 	err = dataset.WriteSubset(data, dataspace, filespace)
-	if err != nil {
-		fmt.Println("final write")
-		panic(err)
-	}
-	fmt.Printf(":: dset.Write... [ok]\n")
-
-	dataspace.Close()
-	filespace.Close()
-}
-
-func writeTriggerConfig(dataset *hdf5.Dataset, event TriggerParamsHDF5) {
-	s2 := make([]TriggerParamsHDF5, 0)
-	s2 = append(s2, event)
-	length := uint(len(s2))
-
-	dims := []uint{length}
-	dataspace, err := hdf5.CreateSimpleDataspace(dims, nil)
-	if err != nil {
-		fmt.Println("space")
-		panic(err)
-	}
-
-	// extend
-	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
-	eventsInFile := dimsGot[0]
-	fmt.Println("Size: ", dimsGot, maxdimsGot)
-	newsize := []uint{eventsInFile + length}
-	dataset.Resize(newsize)
-	filespace := dataset.Space()
-	fmt.Println(filespace)
-
-	start := []uint{eventsInFile}
-	count := []uint{length}
-	filespace.SelectHyperslab(start, nil, count, nil)
-
-	// write data to the dataset
-	fmt.Printf(":: dset.Write...\n")
-	//err = dset.Write(&s2)
-	err = dataset.WriteSubset(&s2, dataspace, filespace)
 	if err != nil {
 		fmt.Println("final write")
 		panic(err)

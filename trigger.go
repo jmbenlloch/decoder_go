@@ -2,30 +2,30 @@ package main
 
 import "fmt"
 
-type TriggeData struct {
-	TriggerType     uint16
-	TriggerLost1    uint32
-	TriggerLost2    uint32
-	TriggerMask     uint32
-	TriggerDiff1    uint16
-	TriggerDiff2    uint16
-	AutoTrigger     uint16
-	DualTrigger     uint16
-	ExternalTrigger uint16
-	Mask            uint16
-	TriggerB2       uint16
-	TriggerB1       uint16
-	ChanA1          uint16
-	ChanA2          uint16
-	ChanB1          uint16
-	ChanB2          uint16
-	WindowA1        uint16
-	WindowB1        uint16
-	WindowA2        uint16
-	WindowB2        uint16
-	TriggerIntN     uint16
-	TriggerExtN     uint16
-	TrgChannels     []uint16
+type TriggerData struct {
+	TriggerType     uint16   `hdf5:"triggerType"`
+	TriggerLost1    uint32   `hdf5:"triggerLost1"`
+	TriggerLost2    uint32   `hdf5:"triggerLost2"`
+	TriggerMask     uint32   `hdf5:"triggerMask"`
+	TriggerDiff1    uint16   `hdf5:"triggerDiff1"`
+	TriggerDiff2    uint16   `hdf5:"triggerDiff2"`
+	AutoTrigger     uint16   `hdf5:"autoTrigger"`
+	DualTrigger     uint16   `hdf5:"dualTrigger"`
+	ExternalTrigger uint16   `hdf5:"externalTrigger"`
+	Mask            uint16   `hdf5:"mask"`
+	TriggerB2       uint16   `hdf5:"triggerB2"`
+	TriggerB1       uint16   `hdf5:"triggerB1"`
+	ChanA1          uint16   `hdf5:"chanA1"`
+	ChanA2          uint16   `hdf5:"chanA2"`
+	ChanB1          uint16   `hdf5:"chanB1"`
+	ChanB2          uint16   `hdf5:"chanB2"`
+	WindowA1        uint16   `hdf5:"windowA1"`
+	WindowB1        uint16   `hdf5:"windowB1"`
+	WindowA2        uint16   `hdf5:"windowA2"`
+	WindowB2        uint16   `hdf5:"windowB2"`
+	TriggerIntN     uint16   `hdf5:"triggerIntN"`
+	TriggerExtN     uint16   `hdf5:"triggerExtN"`
+	TrgChannels     []uint16 `hdf5:"trgChannels"`
 }
 
 func ReadTriggerFEC(data []uint16, event *EventType) {

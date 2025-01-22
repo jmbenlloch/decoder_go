@@ -9,7 +9,7 @@ type EventType struct {
 	Timestamp     uint64
 	SensorsMap    SensorsMap
 	SipmMapping   SensorMapping
-	TriggerConfig TriggeData
+	TriggerConfig TriggerData
 }
 
 type SensorsMap struct {
