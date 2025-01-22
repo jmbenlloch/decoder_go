@@ -3,8 +3,10 @@ package main
 type EventType struct {
 	RunNumber     uint32
 	PmtWaveforms  map[uint16][]int16
+	BlrWaveforms  map[uint16][]int16
 	SipmWaveforms map[uint16][]int16
 	Baselines     map[uint16]uint16
+	BlrBaselines  map[uint16]uint16
 	EventID       uint32
 	Timestamp     uint64
 	SensorsMap    SensorsMap

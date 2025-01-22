@@ -26,9 +26,11 @@ type Writer struct {
 	PmtMappingTable    *hdf5.Dataset
 	SipmMappingTable   *hdf5.Dataset
 	PmtWaveforms       *hdf5.Dataset
+	BlrWaveforms       *hdf5.Dataset
 	ExtTrgWaveform     *hdf5.Dataset
 	SipmWaveforms      *hdf5.Dataset
 	Baselines          *hdf5.Dataset
+	BlrBaselines       *hdf5.Dataset
 }
 
 const N_TRG_CH = 64
@@ -114,7 +116,7 @@ func (w *Writer) WriteEvent(event *EventType) {
 	})
 
 	var pmtSorted, sipmSorted []SensorMappingHDF5
-	var nPmts, nSipms int
+	var nPmts, nBlrs, nSipms int
 	var pmtSamples, sipmSamples int
 
 	if configuration.NoDB {
@@ -128,6 +130,7 @@ func (w *Writer) WriteEvent(event *EventType) {
 		nPmts = len(pmtSorted)
 		nSipms = len(sipmSorted)
 	}
+	nBlrs = len(event.BlrWaveforms)
 
 	if nPmts > 0 {
 		randomPmt := maps.Values(event.PmtWaveforms)[0]
@@ -159,6 +162,11 @@ func (w *Writer) WriteEvent(event *EventType) {
 			w.ExtTrgWaveform = create2dArray(w.RDGroup, "ext_pmt", samples)
 		}
 
+		if len(event.BlrWaveforms) > 0 {
+			w.BlrWaveforms = create3dArray(w.RDGroup, "pmt_blr", nPmts, pmtSamples)
+			w.BlrBaselines = create2dArray(w.RDGroup, "blr_baselines", nPmts)
+		}
+
 		w.FirstEvt = true
 	}
 
@@ -168,6 +176,14 @@ func (w *Writer) WriteEvent(event *EventType) {
 	if nPmts > 0 {
 		writeWaveforms(w.PmtWaveforms, event.PmtWaveforms, pmtSorted, nPmts, pmtSamples)
 		writeBaselines(w.Baselines, event.Baselines, pmtSorted, nPmts)
+	}
+	if nBlrs > 0 {
+		// This uses the same channel order as the PMTs
+		// it works well when reading the channel map from DB
+		// in no-DB mode, if there is a dual channel of a missing normal channel,
+		// it will not be written.
+		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, pmtSorted, nPmts, pmtSamples)
+		writeBaselines(w.BlrBaselines, event.BlrBaselines, pmtSorted, nPmts)
 	}
 	if nSipms > 0 {
 		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, nSipms, sipmSamples)
@@ -219,7 +235,6 @@ func writeBaselines(dset *hdf5.Dataset, baselines map[uint16]uint16,
 		// Write only if the corresponding sensor has data
 		// if not, the baseline will be zero
 		if _, ok := baselines[uint16(sensor.channel)]; !ok {
-			fmt.Println("Baseline not found for sensor ", sensor)
 			continue
 		}
 		data[i] = int16(baselines[uint16(sensor.channel)])
@@ -241,6 +256,12 @@ func (w *Writer) Close() {
 	}
 	if w.ExtTrgWaveform != nil {
 		w.ExtTrgWaveform.Close()
+	}
+	if w.BlrWaveforms != nil {
+		w.BlrWaveforms.Close()
+	}
+	if w.BlrBaselines != nil {
+		w.BlrBaselines.Close()
 	}
 	w.PmtMappingTable.Close()
 	w.SipmMappingTable.Close()
