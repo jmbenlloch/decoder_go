@@ -20,8 +20,8 @@ var sensorsMap *SensorsMap
 var dbConn *sqlx.DB
 var configuration Configuration
 
-var data *[]byte
-var globalPosition int = 0
+//var data *[]byte
+//var globalPosition int = 0
 
 func main() {
 	configFilename := flag.String("config", "", "Configuration file path")
@@ -76,7 +76,7 @@ func main() {
 		return
 	}
 	fmt.Println("Bytes read:", nRead)
-	data = &dataRead
+	//data = &dataRead
 
 	evtCount := countEvents(file)
 
@@ -104,10 +104,6 @@ func main() {
 
 		duration := time.Since(start)
 		totalTime += duration.Milliseconds()
-
-		if evtsProcessed == 62 {
-			break
-		}
 	}
 	fmt.Println("Total time writing: ", totalTime)
 	duration := time.Since(start)
@@ -159,9 +155,6 @@ func sendEventsToWorkers(file *os.File, jobs chan<- WorkerData, configuration Co
 	evtCount := -1
 	for {
 		header, eventData, err := readEvent(file)
-		if evtCount == 62 {
-			break
-		}
 		if err != nil {
 			break
 		}
@@ -186,17 +179,17 @@ func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	headerSize := unsafe.Sizeof(header)
 	//fmt.Println("GDC Header size:", headerSize)
 	headerBinary := make([]byte, headerSize)
-	//nRead, err := file.Read(headerBinary)
-	//if err != nil {
-	//	fmt.Println("Error reading header:", err)
-	//	return header, nil, err
-	//}
-	headerBinary = (*data)[globalPosition : globalPosition+int(headerSize)]
-	globalPosition += int(headerSize)
-	//if nRead == 0 {
-	//	fmt.Println("End of file")
-	//	return header, nil, err
-	//}
+	nRead, err := file.Read(headerBinary)
+	if err != nil {
+		fmt.Println("Error reading header:", err)
+		return header, nil, err
+	}
+	//	headerBinary = (*data)[globalPosition : globalPosition+int(headerSize)]
+	//globalPosition += int(headerSize)
+	if nRead == 0 {
+		fmt.Println("End of file")
+		return header, nil, err
+	}
 
 	headerReader := bytes.NewReader(headerBinary)
 	binary.Read(headerReader, binary.LittleEndian, &header)
@@ -204,10 +197,10 @@ func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	//fmt.Println("Header:", header)
 
 	payloadSize := uint32(header.EventSize) - uint32(headerSize)
-	//eventData := make([]byte, payloadSize)
-	//file.Read(eventData)
-	eventData := (*data)[globalPosition : globalPosition+int(payloadSize)]
-	globalPosition += int(payloadSize)
+	eventData := make([]byte, payloadSize)
+	file.Read(eventData)
+	//eventData := (*data)[globalPosition : globalPosition+int(payloadSize)]
+	//globalPosition += int(payloadSize)
 	return header, eventData, nil
 }
 
