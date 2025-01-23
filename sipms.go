@@ -6,7 +6,8 @@ import (
 	"sort"
 )
 
-func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct, event *EventType) {
+func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct,
+	event *EventType, sipmPayloads map[uint16][]uint16) {
 	FecID := evtFormat.FecID
 	ZeroSuppression := evtFormat.ZeroSuppression
 	CompressedData := evtFormat.CompressedData
@@ -54,23 +55,23 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 	payloadChanB, chanBFound := sipmPayloads[channelB]
 
 	if chanAFound && chanBFound {
-		fmt.Println("A pair of SIPM FECs has been read, decoding... ", channelA, channelB)
+		//fmt.Println("A pair of SIPM FECs has been read, decoding... ", channelA, channelB)
 		// Rebuild payload from the two links
 		payload := buildSipmData(payloadChanA, payloadChanB)
 		position := 0
 		// Print the first 100 bytes in hex from payload separated by spaces
-		fmt.Println("sipm data: ")
-		for i := 0; i < 50; i++ {
-			fmt.Printf("%04x ", payload[i])
-		}
-		fmt.Println()
+		//fmt.Println("sipm data: ")
+		//for i := 0; i < 50; i++ {
+		//	fmt.Printf("%04x ", payload[i])
+		//}
+		//fmt.Println()
 
 		// Print the lastest 100 bytes in hex from payload separated by spaces
-		fmt.Println("sipm data end: ")
-		for i := len(payload) - 50; i < len(payload); i++ {
-			fmt.Printf("%04x ", payload[i])
-		}
-		fmt.Println()
+		//fmt.Println("sipm data end: ")
+		//for i := len(payload) - 50; i < len(payload); i++ {
+		//	fmt.Printf("%04x ", payload[i])
+		//}
+		//fmt.Println()
 
 		// Read data
 		time := -1
@@ -145,7 +146,7 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 					var chMask []uint16
 					chMask, position = sipmChannelMask(payload, position, febID)
 					chMasks[febID] = chMask
-					fmt.Printf("Channel mask: %v\n", chMask)
+					//fmt.Printf("Channel mask: %v\n", chMask)
 					initializeLastValues(lastValues, chMask)
 					initializeWaveforms(event.SipmWaveforms, chMask, bufferSamples)
 				}
@@ -350,7 +351,7 @@ func decodeCharge(data []uint16, position int, waveforms map[uint16][]int16, cha
 			positionCharge += 2
 		}
 
-		fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x", channelMask[channelID], time, charge)
+		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x", channelMask[channelID], time, charge)
 
 		waveforms[channelID][time] = int16(charge)
 

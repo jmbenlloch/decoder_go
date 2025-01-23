@@ -1,9 +1,5 @@
 package main
 
-import (
-	"fmt"
-)
-
 type TriggerData struct {
 	TriggerType     uint16   `hdf5:"triggerType"`
 	TriggerLost1    uint32   `hdf5:"triggerLost1"`
@@ -33,15 +29,15 @@ type TriggerData struct {
 func ReadTriggerFEC(data []uint16, event *EventType) {
 	position := 0
 
-	for dbg := 0; dbg < 9; dbg++ {
-		fmt.Printf("TrgConf[%d] = 0x%04x\n", dbg, data[dbg])
-	}
-	for dbg := 0; dbg < 4; dbg++ {
-		fmt.Printf("Ch info[%d] = 0x%04x\n", dbg, data[dbg+9])
-	}
-	for dbg := 0; dbg < 4; dbg++ {
-		fmt.Printf("Trigger lost[%d] = 0x%04x\n", dbg, data[dbg+13])
-	}
+	//for dbg := 0; dbg < 9; dbg++ {
+	//	fmt.Printf("TrgConf[%d] = 0x%04x\n", dbg, data[dbg])
+	//}
+	//for dbg := 0; dbg < 4; dbg++ {
+	//	fmt.Printf("Ch info[%d] = 0x%04x\n", dbg, data[dbg+9])
+	//}
+	//for dbg := 0; dbg < 4; dbg++ {
+	//	fmt.Printf("Trigger lost[%d] = 0x%04x\n", dbg, data[dbg+13])
+	//}
 
 	//TRG conf 8
 	triggerMask := uint32(data[position]&0x003FF) << 16
@@ -102,7 +98,7 @@ func ReadTriggerFEC(data []uint16, event *EventType) {
 	for chinfo := 0; chinfo < 3; chinfo++ {
 		for j := 15; j >= 0; j-- {
 			activePMT := CheckBit(data[position]&0x0FFFF, uint16(j))
-			fmt.Printf("trigger ch %d: %t\n", channelNumber, activePMT)
+			//fmt.Printf("trigger ch %d: %t\n", channelNumber, activePMT)
 			if activePMT {
 				trgChannels = append(trgChannels, channelNumber)
 			}
@@ -148,29 +144,29 @@ func ReadTriggerFEC(data []uint16, event *EventType) {
 	trgInfo.TriggerExtN = triggerExtN
 	trgInfo.TrgChannels = trgChannels
 
-	fmt.Printf("trgInfo.TriggerType: %d\n", trgInfo.TriggerType)
-	fmt.Printf("trgInfo.TriggerLost1: %d\n", trgInfo.TriggerLost1)
-	fmt.Printf("trgInfo.TriggerLost2: %d\n", trgInfo.TriggerLost2)
-	fmt.Printf("trgInfo.TriggerMask: %d\n", trgInfo.TriggerMask)
-	fmt.Printf("trgInfo.TriggerDiff1: %d\n", trgInfo.TriggerDiff1)
-	fmt.Printf("trgInfo.TriggerDiff2: %d\n", trgInfo.TriggerDiff2)
-	fmt.Printf("trgInfo.AutoTrigger: %d\n", trgInfo.AutoTrigger)
-	fmt.Printf("trgInfo.DualTrigger: %d\n", trgInfo.DualTrigger)
-	fmt.Printf("trgInfo.ExternalTrigger: %d\n", trgInfo.ExternalTrigger)
-	fmt.Printf("trgInfo.Mask: %d\n", trgInfo.Mask)
-	fmt.Printf("trgInfo.TriggerB2: %d\n", trgInfo.TriggerB2)
-	fmt.Printf("trgInfo.TriggerB1: %d\n", trgInfo.TriggerB1)
-	fmt.Printf("trgInfo.ChanA1: %d\n", trgInfo.ChanA1)
-	fmt.Printf("trgInfo.ChanA2: %d\n", trgInfo.ChanA2)
-	fmt.Printf("trgInfo.ChanB1: %d\n", trgInfo.ChanB1)
-	fmt.Printf("trgInfo.ChanB2: %d\n", trgInfo.ChanB2)
-	fmt.Printf("trgInfo.WindowA1: %d\n", trgInfo.WindowA1)
-	fmt.Printf("trgInfo.WindowB1: %d\n", trgInfo.WindowB1)
-	fmt.Printf("trgInfo.WindowA2: %d\n", trgInfo.WindowA2)
-	fmt.Printf("trgInfo.WindowB2: %d\n", trgInfo.WindowB2)
-	fmt.Printf("trgInfo.TriggerIntN: %d\n", trgInfo.TriggerIntN)
-	fmt.Printf("trgInfo.TriggerExtN: %d\n", trgInfo.TriggerExtN)
-	fmt.Printf("trgInfo.TrgChannel: %v\n", trgInfo.TrgChannels)
+	//fmt.Printf("trgInfo.TriggerType: %d\n", trgInfo.TriggerType)
+	//fmt.Printf("trgInfo.TriggerLost1: %d\n", trgInfo.TriggerLost1)
+	//fmt.Printf("trgInfo.TriggerLost2: %d\n", trgInfo.TriggerLost2)
+	//fmt.Printf("trgInfo.TriggerMask: %d\n", trgInfo.TriggerMask)
+	//fmt.Printf("trgInfo.TriggerDiff1: %d\n", trgInfo.TriggerDiff1)
+	//fmt.Printf("trgInfo.TriggerDiff2: %d\n", trgInfo.TriggerDiff2)
+	//fmt.Printf("trgInfo.AutoTrigger: %d\n", trgInfo.AutoTrigger)
+	//fmt.Printf("trgInfo.DualTrigger: %d\n", trgInfo.DualTrigger)
+	//fmt.Printf("trgInfo.ExternalTrigger: %d\n", trgInfo.ExternalTrigger)
+	//fmt.Printf("trgInfo.Mask: %d\n", trgInfo.Mask)
+	//fmt.Printf("trgInfo.TriggerB2: %d\n", trgInfo.TriggerB2)
+	//fmt.Printf("trgInfo.TriggerB1: %d\n", trgInfo.TriggerB1)
+	//fmt.Printf("trgInfo.ChanA1: %d\n", trgInfo.ChanA1)
+	//fmt.Printf("trgInfo.ChanA2: %d\n", trgInfo.ChanA2)
+	//fmt.Printf("trgInfo.ChanB1: %d\n", trgInfo.ChanB1)
+	//fmt.Printf("trgInfo.ChanB2: %d\n", trgInfo.ChanB2)
+	//fmt.Printf("trgInfo.WindowA1: %d\n", trgInfo.WindowA1)
+	//fmt.Printf("trgInfo.WindowB1: %d\n", trgInfo.WindowB1)
+	//fmt.Printf("trgInfo.WindowA2: %d\n", trgInfo.WindowA2)
+	//fmt.Printf("trgInfo.WindowB2: %d\n", trgInfo.WindowB2)
+	//fmt.Printf("trgInfo.TriggerIntN: %d\n", trgInfo.TriggerIntN)
+	//fmt.Printf("trgInfo.TriggerExtN: %d\n", trgInfo.TriggerExtN)
+	//fmt.Printf("trgInfo.TrgChannel: %v\n", trgInfo.TrgChannels)
 }
 
 func CheckBit(mask uint16, pos uint16) bool {

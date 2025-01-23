@@ -61,7 +61,7 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 		}
 		parse_huffman_line(int32(result.Value), result.Code, huffman)
 	}
-	printfHuffman(huffman, 1)
+	//printfHuffman(huffman, 1)
 	return huffman, nil
 }
 
@@ -69,7 +69,7 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
 	query := "SELECT ElecID, SensorID FROM ChannelMapping WHERE MinRun <= %d and MaxRun >= %d ORDER BY SensorID"
 	query = fmt.Sprintf(query, runNumber, runNumber)
 	fmt.Println("Query: ", query)
-	fmt.Println("SiPM Huffman codes read from DB")
+	fmt.Println("Channel mapping read from DB")
 
 	rows, err := db.Queryx(query)
 	if err != nil {

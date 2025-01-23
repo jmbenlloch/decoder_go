@@ -1,12 +1,10 @@
 package main
 
-import "fmt"
-
 func ReadCommonHeader(data []uint16) EventFormat {
 	position := 0
 	evtFormat := EventFormat{}
 	sequenceCounter, position := readSeqCounter(data, position)
-	fmt.Println("Sequence Counter:", sequenceCounter)
+	//fmt.Println("Sequence Counter:", sequenceCounter)
 	if sequenceCounter == 0 {
 		position = readFormatID(data, position, &evtFormat)
 		position = readWordCount(data, position, &evtFormat)
@@ -84,13 +82,13 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 	FWVersion := data[position] & 0x0FFFF
 	position++
 
-	fmt.Println("FecType:", FecType)
-	fmt.Println("ZeroSuppression:", ZeroSuppression)
-	fmt.Println("CompressedData:", CompressedData)
-	fmt.Println("Baseline:", Baseline)
-	fmt.Println("DualModeBit:", DualModeBit)
-	fmt.Println("ErrorBit:", ErrorBit)
-	fmt.Println("FWVersion:", FWVersion)
+	//fmt.Println("FecType:", FecType)
+	//fmt.Println("ZeroSuppression:", ZeroSuppression)
+	//fmt.Println("CompressedData:", CompressedData)
+	//fmt.Println("Baseline:", Baseline)
+	//fmt.Println("DualModeBit:", DualModeBit)
+	//fmt.Println("ErrorBit:", ErrorBit)
+	//fmt.Println("FWVersion:", FWVersion)
 
 	evtFormat.FecType = FecType
 	evtFormat.ZeroSuppression = ZeroSuppression > 0
@@ -106,7 +104,7 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 func readWordCount(data []uint16, position int, evtFormat *EventFormat) int {
 	WordCounter := data[position] & 0x0FFFF
 	position++
-	fmt.Println("Word Counter:", WordCounter)
+	//fmt.Println("Word Counter:", WordCounter)
 	evtFormat.WordCount = WordCounter
 	return position
 }
@@ -115,8 +113,8 @@ func readEventID(data []uint16, position int, evtFormat *EventFormat) int {
 	TriggerType := data[position] & 0x000F
 	TriggerCounter := (uint32(data[position]&0x0FFF0) << 12) + (uint32(data[position+1]) & 0x0FFFF)
 	position += 2
-	fmt.Println("Trigger Type:", TriggerType)
-	fmt.Println("Trigger Counter:", TriggerCounter)
+	//fmt.Println("Trigger Type:", TriggerType)
+	//fmt.Println("Trigger Counter:", TriggerCounter)
 	evtFormat.TriggerType = TriggerType
 	evtFormat.TriggerCounter = TriggerCounter
 	return position
@@ -149,11 +147,11 @@ func readEventConfJuliett(data []uint16, position int, evtFormat *EventFormat) i
 	evtFormat.PreTrigger2 = PreTriggerSamples2
 	evtFormat.ChannelMask = ChannelMask
 
-	fmt.Println("Buffer Samples:", BufferSamples)
-	fmt.Println("PreTrigger Samples:", PreTriggerSamples)
-	fmt.Println("Buffer Samples2:", BufferSamples2)
-	fmt.Println("PreTrigger Samples2:", PreTriggerSamples2)
-	fmt.Println("Channel Mask:", ChannelMask)
+	//fmt.Println("Buffer Samples:", BufferSamples)
+	//fmt.Println("PreTrigger Samples:", PreTriggerSamples)
+	//fmt.Println("Buffer Samples2:", BufferSamples2)
+	//fmt.Println("PreTrigger Samples2:", PreTriggerSamples2)
+	//fmt.Println("Channel Mask:", ChannelMask)
 	return position
 }
 
@@ -202,7 +200,7 @@ func readIndiaBaselines(data []uint16, position int, evtFormat *EventFormat) int
 
 	evtFormat.Baselines = baselines
 
-	fmt.Println("Baselines:", baselines)
+	//fmt.Println("Baselines:", baselines)
 	return position
 }
 
@@ -211,8 +209,8 @@ func readIndiaFecID(data []uint16, position int, evtFormat *EventFormat) int {
 	FecID := (data[position] & 0x0FFE0) >> 5
 	position++
 
-	fmt.Println("Number of Channels:", NumberOfChannels)
-	fmt.Println("Fec ID:", FecID)
+	//fmt.Println("Number of Channels:", NumberOfChannels)
+	//fmt.Println("Fec ID:", FecID)
 
 	evtFormat.NumberOfChannels = NumberOfChannels
 	evtFormat.FecID = FecID
@@ -237,8 +235,8 @@ func readCTandFTh(data []uint16, position int, evtFormat *EventFormat) int {
 	FTBit := int32((data[position] & 0x8000) >> 15)
 	position++
 
-	fmt.Println("Timestamp:", Timestamp)
-	fmt.Println("FTBit:", FTBit)
+	//fmt.Println("Timestamp:", Timestamp)
+	//fmt.Println("FTBit:", FTBit)
 
 	evtFormat.Timestamp = Timestamp
 	evtFormat.FTBit = FTBit
@@ -249,7 +247,7 @@ func readCTandFTh(data []uint16, position int, evtFormat *EventFormat) int {
 func readFTl(data []uint16, position int, evtFormat *EventFormat) int {
 	TriggerFT := data[position] & 0x0FFFF
 	position++
-	fmt.Println("TriggerFT:", TriggerFT)
+	//fmt.Println("TriggerFT:", TriggerFT)
 
 	evtFormat.TriggerFT = TriggerFT
 

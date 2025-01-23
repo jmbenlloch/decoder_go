@@ -38,6 +38,8 @@ func NewWriter(filename string) *Writer {
 	// Set string size for HDF5
 	hdf5.SetStringLength(STRLEN)
 
+	//hdf5.RegisterBlosc()
+
 	writer := &Writer{}
 	writer.File = openFile(filename)
 	writer.RunGroup, _ = createGroup(writer.File, "Run")

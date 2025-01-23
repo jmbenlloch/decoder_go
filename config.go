@@ -25,6 +25,7 @@ type Configuration struct {
 	User        string `json:"user"`
 	Passwd      string `json:"pass"`
 	DBName      string `json:"dbname"`
+	NumWorkers  int    `json:"num_workers"`
 }
 
 func LoadConfiguration(filename string) (Configuration, error) {
@@ -47,6 +48,7 @@ func LoadConfiguration(filename string) (Configuration, error) {
 	config.User = "nextreader"
 	config.Passwd = "readonly"
 	config.DBName = "NEXT100"
+	config.NumWorkers = 1
 
 	data, err := os.ReadFile(filename)
 	if err != nil {

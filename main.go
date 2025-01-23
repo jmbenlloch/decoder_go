@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 	"unsafe"
 
 	sqlx "github.com/jmoiron/sqlx"
@@ -13,14 +14,14 @@ import (
 
 const CLOCK_TICK float32 = 0.025
 
-// Map to keep SiPM data until is read. FEC-ID -> SiPM data
-var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
-
 var huffmanCodesPmts *HuffmanNode
 var huffmanCodesSipms *HuffmanNode
 var sensorsMap *SensorsMap
 var dbConn *sqlx.DB
 var configuration Configuration
+
+var data *[]byte
+var globalPosition int = 0
 
 func main() {
 	configFilename := flag.String("config", "", "Configuration file path")
@@ -54,11 +55,118 @@ func main() {
 	}
 	defer writer.Close()
 
+	jobs := make(chan WorkerData, configuration.NumWorkers)
+	results := make(chan EventType, 1000)
+
+	for w := 1; w <= configuration.NumWorkers; w++ {
+		go worker(w, jobs, results)
+	}
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		fmt.Println("Error getting file info:", err)
+		return
+	}
+	fileSize := fileInfo.Size()
+	fmt.Println("File size in bytes:", fileSize)
+	dataRead := make([]byte, fileSize)
+	nRead, err := file.Read(dataRead)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Println("Bytes read:", nRead)
+	data = &dataRead
+
+	evtCount := countEvents(file)
+
+	start := time.Now()
+	go sendEventsToWorkers(file, jobs, configuration)
+
+	var totalTime int64 = 0
+
+	evtsProcessed := 0
+	for event := range results {
+		fmt.Println("Processed event: ", evtsProcessed, event.EventID, evtCount)
+		evtsProcessed++
+
+		start := time.Now()
+		//if configuration.SplitTrg {
+		//	switch int(event.TriggerType) {
+		//	case configuration.TrgCode1:
+		//		writer.WriteEvent(&event)
+		//	case configuration.TrgCode2:
+		//		writer2.WriteEvent(&event)
+		//	}
+		//} else {
+		//	writer.WriteEvent(&event)
+		//}
+
+		duration := time.Since(start)
+		totalTime += duration.Milliseconds()
+
+		if evtsProcessed == 62 {
+			break
+		}
+	}
+	fmt.Println("Total time writing: ", totalTime)
+	duration := time.Since(start)
+	fmt.Println("Total time : ", duration.Milliseconds())
+	close(results)
+}
+
+func countEvents(file *os.File) int {
+	evtCount := 0
+	for {
+		var header EventHeaderStruct
+		headerSize := unsafe.Sizeof(header)
+		headerBinary := make([]byte, headerSize)
+		nRead, err := file.Read(headerBinary)
+		if err != nil {
+			fmt.Println("Error reading header:", err)
+			break
+		}
+		if nRead == 0 {
+			fmt.Println("End of file")
+			break
+		}
+
+		headerReader := bytes.NewReader(headerBinary)
+		binary.Read(headerReader, binary.LittleEndian, &header)
+		fmt.Printf("Evt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
+		//fmt.Println("Header:", header)
+		payloadSize := uint32(header.EventSize) - uint32(headerSize)
+		//fmt.Println("Payload size:", payloadSize)
+		//fmt.Println("event type: ", header.EventType)
+		file.Seek(int64(payloadSize), 1)
+
+		if !validEvent(header) {
+			continue
+		}
+		evtCount++
+	}
+	// Go back to the beginning of the file
+	file.Seek(0, 0)
+	fmt.Println("Number of events:", evtCount)
+	return evtCount
+}
+
+func validEvent(header EventHeaderStruct) bool {
+	return header.EventType == PHYSICS_EVENT || header.EventType == CALIBRATION_EVENT
+}
+
+func sendEventsToWorkers(file *os.File, jobs chan<- WorkerData, configuration Configuration) {
 	evtCount := -1
 	for {
 		header, eventData, err := readEvent(file)
+		if evtCount == 62 {
+			break
+		}
 		if err != nil {
 			break
+		}
+		if !validEvent(header) {
+			continue
 		}
 		evtCount++
 		if evtCount >= configuration.MaxEvents {
@@ -67,48 +175,46 @@ func main() {
 		if evtCount < configuration.Skip {
 			continue
 		}
-		event := readGDC(eventData, header)
-
-		if configuration.SplitTrg {
-			switch int(event.TriggerType) {
-			case configuration.TrgCode1:
-				writer.WriteEvent(&event)
-			case configuration.TrgCode2:
-				writer2.WriteEvent(&event)
-			}
-		} else {
-			writer.WriteEvent(&event)
-		}
+		//event := readGDC(eventData, header)
+		jobs <- WorkerData{Data: eventData, Header: header}
 	}
+	close(jobs)
 }
+
 func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
-	fmt.Println("GDC Header size:", headerSize)
+	//fmt.Println("GDC Header size:", headerSize)
 	headerBinary := make([]byte, headerSize)
-	nRead, err := file.Read(headerBinary)
-	if err != nil {
-		fmt.Println("Error reading header:", err)
-		return header, nil, err
-	}
-	if nRead == 0 {
-		fmt.Println("End of file")
-		return header, nil, err
-	}
+	//nRead, err := file.Read(headerBinary)
+	//if err != nil {
+	//	fmt.Println("Error reading header:", err)
+	//	return header, nil, err
+	//}
+	headerBinary = (*data)[globalPosition : globalPosition+int(headerSize)]
+	globalPosition += int(headerSize)
+	//if nRead == 0 {
+	//	fmt.Println("End of file")
+	//	return header, nil, err
+	//}
 
 	headerReader := bytes.NewReader(headerBinary)
 	binary.Read(headerReader, binary.LittleEndian, &header)
-	fmt.Printf("Evt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
-	fmt.Println("Header:", header)
-	fmt.Println("Superevent:", header.EventTypeAttribute[0]&SUPER_EVENT)
+	//fmt.Printf("Evt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
+	//fmt.Println("Header:", header)
 
 	payloadSize := uint32(header.EventSize) - uint32(headerSize)
-	eventData := make([]byte, payloadSize)
-	file.Read(eventData)
+	//eventData := make([]byte, payloadSize)
+	//file.Read(eventData)
+	eventData := (*data)[globalPosition : globalPosition+int(payloadSize)]
+	globalPosition += int(payloadSize)
 	return header, eventData, nil
 }
 
 func readGDC(eventData []byte, header EventHeaderStruct) EventType {
+	// Map to keep SiPM data until is read. FEC-ID -> SiPM data
+	var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
+
 	event := EventType{
 		PmtWaveforms:  make(map[uint16][]int16),
 		BlrWaveforms:  make(map[uint16][]int16),
@@ -122,15 +228,18 @@ func readGDC(eventData []byte, header EventHeaderStruct) EventType {
 	// If we want to use the DB and the sensors map is not loaded, load it
 	if !configuration.NoDB && sensorsMap == nil {
 		event.SensorsMap = getSensorsFromDB(dbConn, int(header.EventRunNb))
+		sensorsMap = &event.SensorsMap
+	} else {
+		event.SensorsMap = *sensorsMap
 	}
 
 	// Read LDCs
 	position := 0
 	for {
-		nRead := readLDC(eventData, position, &event)
+		nRead := readLDC(eventData, position, &event, sipmPayloads)
 		// Next LDC
 		position += nRead
-		fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
+		//fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
 		if position >= len(eventData) {
 			break
 		}
@@ -180,22 +289,22 @@ func processPmtIds(event *EventType, configuration Configuration) {
 	}
 }
 
-func readLDC(eventData []byte, position int, event *EventType) int {
+func readLDC(eventData []byte, position int, event *EventType, sipmPayloads map[uint16][]uint16) int {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
-	fmt.Println("LDC header size:", headerSize)
+	//fmt.Println("LDC header size:", headerSize)
 	ldcHeaderBinary := eventData[position : position+int(headerSize)]
 	ldcHeaderReader := bytes.NewReader(ldcHeaderBinary)
 	binary.Read(ldcHeaderReader, binary.LittleEndian, &header)
-	fmt.Printf("\tEvt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
-	fmt.Println("\tHeader:", header)
-	fmt.Println("\tSuperevent:", header.EventTypeAttribute[0]&SUPER_EVENT)
+	//fmt.Printf("\tEvt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
+	//fmt.Println("\tHeader:", header)
+	//fmt.Println("\tSuperevent:", header.EventTypeAttribute[0]&SUPER_EVENT)
 
 	// Read equipment header
 	startLDCPayload := position + int(header.EventHeadSize)
 	startPosition := 0
 	for {
-		nRead := readEquipment(eventData[startLDCPayload:], startPosition, header, event)
+		nRead := readEquipment(eventData[startLDCPayload:], startPosition, header, event, sipmPayloads)
 		// Next equipment
 		startPosition += nRead
 		if startPosition+int(header.EventHeadSize) >= int(header.EventSize) {
@@ -206,47 +315,48 @@ func readLDC(eventData []byte, position int, event *EventType) int {
 	return int(header.EventSize)
 }
 
-func readEquipment(eventData []byte, position int, header EventHeaderStruct, event *EventType) int {
+func readEquipment(eventData []byte, position int, header EventHeaderStruct, event *EventType,
+	sipmPayloads map[uint16][]uint16) int {
 	var eqHeader EquipmentHeaderStruct
 	eqHeaderSize := unsafe.Sizeof(eqHeader)
-	fmt.Println("Equipment Header size:", eqHeaderSize)
+	//fmt.Println("Equipment Header size:", eqHeaderSize)
 
-	fmt.Println("\t\tPosition:", position)
+	//fmt.Println("\t\tPosition:", position)
 
 	eqHeaderBinary := eventData[position : position+int(eqHeaderSize)]
 	eqHeaderReader := bytes.NewReader(eqHeaderBinary)
 	binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
-	fmt.Printf("\t\tEq id: %d. eq type %d\n", eqHeader.EquipmentId, eqHeader.EquipmentType)
-	fmt.Println("\t\tHeader:", eqHeader)
-	fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", position)
+	//fmt.Printf("\t\tEq id: %d. eq type %d\n", eqHeader.EquipmentId, eqHeader.EquipmentType)
+	//fmt.Println("\t\tHeader:", eqHeader)
+	//fmt.Printf("\t\teqPosition: %d, offset: %d, ldc size: %d\n", position)
 
 	start := position + int(eqHeaderSize)
 	end := position + int(eqHeader.EquipmentSize)
 	payload := flipWords(eventData[start:end])
 
-	fmt.Printf("\t\t payload: ")
-	for i := 0; i < 30; i++ {
-		fmt.Printf(" %x", payload[i])
-	}
-	fmt.Printf("\n")
+	//fmt.Printf("\t\t payload: ")
+	//for i := 0; i < 30; i++ {
+	//	fmt.Printf(" %x", payload[i])
+	//}
+	//fmt.Printf("\n")
 
-	fmt.Printf("\t\t originl: ")
-	for i := 0; i < 20; i++ {
-		fmt.Printf(" %x", eventData[start+i])
-	}
-	fmt.Printf("\n")
+	//fmt.Printf("\t\t originl: ")
+	//for i := 0; i < 20; i++ {
+	//	fmt.Printf(" %x", eventData[start+i])
+	//}
+	//fmt.Printf("\n")
 
-	fmt.Printf("\t\t end payload: ")
-	for i := len(payload) - 20; i < len(payload); i++ {
-		fmt.Printf(" %x", payload[i])
-	}
-	fmt.Printf("\n")
+	//fmt.Printf("\t\t end payload: ")
+	//for i := len(payload) - 20; i < len(payload); i++ {
+	//	fmt.Printf(" %x", payload[i])
+	//}
+	//fmt.Printf("\n")
 
-	fmt.Printf("\t\t end originl: ")
-	for i := end - 20; i < end; i++ {
-		fmt.Printf(" %x", eventData[i])
-	}
-	fmt.Printf("\n")
+	//fmt.Printf("\t\t end originl: ")
+	//for i := end - 20; i < end; i++ {
+	//	fmt.Printf(" %x", eventData[i])
+	//}
+	//fmt.Printf("\n")
 
 	evtFormat := ReadCommonHeader(payload)
 	// Set event timestamp. All subevents should be at the same time
@@ -257,20 +367,20 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 
 	switch evtFormat.FWVersion {
 	case 10:
-		fmt.Println("FW Version 10")
+		//fmt.Println("FW Version 10")
 		switch evtFormat.FecType {
 		case 0:
-			fmt.Println("PMT FEC")
+			//fmt.Println("PMT FEC")
 			if configuration.ReadPMTs {
 				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
 			}
 		case 1:
-			fmt.Println("SiPM FEC")
+			//fmt.Println("SiPM FEC")
 			if configuration.ReadSiPMs {
-				ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				ReadSipmFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event, sipmPayloads)
 			}
 		case 2:
-			fmt.Println("Trigger FEC")
+			//fmt.Println("Trigger FEC")
 			if configuration.ReadTrigger {
 				ReadTriggerFEC(payload[evtFormat.HeaderSize:], event)
 			}
@@ -284,32 +394,32 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 func flipWords(data []byte) []uint16 {
 	positionIn := 0
 	positionOut := 0
-	fmt.Println("Data size:", len(data))
-	fmt.Printf("Data: ")
-	for i := len(data) - 20; i < len(data); i++ {
-		fmt.Printf(" %x", data[i])
-	}
-	fmt.Printf("\n")
+	//fmt.Println("Data size:", len(data))
+	//fmt.Printf("Data: ")
+	//for i := len(data) - 20; i < len(data); i++ {
+	//	fmt.Printf(" %x", data[i])
+	//}
+	//fmt.Printf("\n")
 
 	dataUint16 := *(*[]uint16)(unsafe.Pointer(&data))
-	fmt.Println("Data size casted to uint16:", len(dataUint16))
-	fmt.Printf("Data casted: ")
-	for i := len(data)/2 - 20; i < len(data)/2; i++ {
-		fmt.Printf(" %x", dataUint16[i])
-	}
-	fmt.Printf("\n")
+	//	fmt.Println("Data size casted to uint16:", len(dataUint16))
+	//	fmt.Printf("Data casted: ")
+	//for i := len(data)/2 - 20; i < len(data)/2; i++ {
+	//	fmt.Printf(" %x", dataUint16[i])
+	//}
+	//fmt.Printf("\n")
 
-	fmt.Printf("Data start: ")
-	for i := 0; i < 20; i++ {
-		fmt.Printf(" %x", data[i])
-	}
-	fmt.Printf("\n")
+	//fmt.Printf("Data start: ")
+	//for i := 0; i < 20; i++ {
+	//	fmt.Printf(" %x", data[i])
+	//}
+	//fmt.Printf("\n")
 
-	fmt.Printf("Data start casted: ")
-	for i := 0; i < 20; i++ {
-		fmt.Printf(" %x", dataUint16[i])
-	}
-	fmt.Printf("\n")
+	//fmt.Printf("Data start casted: ")
+	//for i := 0; i < 20; i++ {
+	//	fmt.Printf(" %x", dataUint16[i])
+	//}
+	//fmt.Printf("\n")
 
 	dataFlipped := make([]uint16, len(data)/2) // TODO round up
 

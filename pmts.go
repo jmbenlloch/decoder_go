@@ -57,7 +57,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 
 	// Write pedestal
 	if Baseline {
-		fmt.Println("Baselines: ", event.Baselines)
+		//fmt.Println("Baselines: ", event.Baselines)
 		writePmtPedestals(evtFormat, channelMask, event.Baselines)
 	}
 
@@ -180,7 +180,7 @@ func pmtsChannelMask(evtFormat *EventFormat) []uint16 {
 		}
 	}
 
-	fmt.Printf("Channel mask is %v\n", channelMaskVec)
+	//fmt.Printf("Channel mask is %v\n", channelMaskVec)
 	return channelMaskVec
 }
 
