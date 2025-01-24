@@ -31,9 +31,17 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 		}
 	}
 
+	MAX_SiPMs := 3584
+	MAX_FEBs := 56
 	// Map elecID -> last_value (for decompression)
-	lastValues := make(map[uint16]int16)
-	chMasks := make(map[uint16][]uint16)
+	// Previous waveform values, used for decompression
+	// Values are indexed by sipmPosition(elecID) to avoid
+	// using the map for every waveform sample
+	lastValues := make([]int16, MAX_SiPMs)
+	// Channel mask for each FEB, first index is the FEB ID
+	chMasks := make([][]uint16, MAX_FEBs)
+
+	wfPointers := make([]*[]int16, MAX_SiPMs)
 
 	// Store the payload until we have the two links
 	// Each SiPM FEC has two links (with its own FEC ID)
@@ -143,18 +151,20 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 				// If RAW mode, channel mask will appear the first time
 				// If ZS mode, channel mask will appear each time
 				if time < 1 || ZeroSuppression {
-					var chMask []uint16
-					chMask, position = sipmChannelMask(payload, position, febID)
-					chMasks[febID] = chMask
-					//fmt.Printf("Channel mask: %v\n", chMask)
-					initializeLastValues(lastValues, chMask)
+					var chMask, chPositions []uint16
+					chMask, chPositions, position = sipmChannelMask(payload, position, febID)
+					chMasks[febID] = chPositions
+					//					fmt.Printf("time : %d %t\n", time, ZeroSuppression)
+					//					fmt.Printf("Channel mask: %v\n", chMask)
+					//					fmt.Println("Channel positions: ", chPositions)
 					initializeWaveforms(event.SipmWaveforms, chMask, bufferSamples)
+					computeSipmWaveformPointerArray(wfPointers, event.SipmWaveforms, chMask, chPositions)
 				}
 
 				if ZeroSuppression {
 					if CompressedData {
 						current_bit := 31
-						position = decodeChargeIndiaSipmCompressed(payload, position, event.SipmWaveforms,
+						position = decodeChargeIndiaSipmCompressed(payload, position, wfPointers,
 							&current_bit, huffmanCodesSipms, chMasks[febID], lastValues, timeinmus)
 					} else {
 						position = decodeCharge(data, position, event.SipmWaveforms, chMasks[febID], timeinmus)
@@ -162,7 +172,7 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 				} else {
 					if CompressedData {
 						current_bit := 31
-						position = decodeChargeIndiaSipmCompressed(payload, position, event.SipmWaveforms,
+						position = decodeChargeIndiaSipmCompressed(payload, position, wfPointers,
 							&current_bit, huffmanCodesSipms, chMasks[febID], lastValues, uint32(time))
 					} else {
 						position = decodeCharge(data, position, event.SipmWaveforms, chMasks[febID], uint32(time))
@@ -174,7 +184,6 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 			delete(sipmPayloads, channelA)
 			delete(sipmPayloads, channelB)
 		}
-
 	}
 }
 
@@ -234,10 +243,13 @@ func computeSipmTime(data []uint16, position int, evtFormat *EventFormat) (uint3
 // MSB ch63, LSB ch0
 // Data came after chmask, ordered from 0 to 63
 // Returns vector with active ElecIDs and new position
-func sipmChannelMask(data []uint16, position int, febID uint16) ([]uint16, int) {
-	TotalNumberOfSiPMs := 0
+func sipmChannelMask(data []uint16, position int, febID uint16) ([]uint16, []uint16, int) {
 	var ElecID uint16
 	channelMaskVector := make([]uint16, 0)
+	// To avoid using the map for every waveform sample we are keeping another
+	// vector with the pointers to the waveforms. This positions vector indicates
+	// the position of the waveform in the waveforms pointer array.
+	positions := make([]uint16, 0)
 
 	var l, t uint16
 	for l = 4; l > 0; l-- {
@@ -247,7 +259,6 @@ func sipmChannelMask(data []uint16, position int, febID uint16) ([]uint16, int) 
 
 			if active {
 				channelMaskVector = append(channelMaskVector, ElecID)
-				TotalNumberOfSiPMs++
 			}
 		}
 		position++
@@ -257,12 +268,30 @@ func sipmChannelMask(data []uint16, position int, febID uint16) ([]uint16, int) 
 		return channelMaskVector[i] < channelMaskVector[j]
 	})
 
-	return channelMaskVector, position
+	// Save positions after sorting the elecIDs
+	for _, elecID := range channelMaskVector {
+		positions = append(positions, computeSipmPosition(elecID))
+	}
+
+	return channelMaskVector, positions, position
+}
+
+func computeSipmPosition(elecID uint16) uint16 {
+	position := (elecID / 64) + (elecID % 64)
+	return position
+}
+
+func computeSipmWaveformPointerArray(wfPointers []*[]int16, waveforms map[uint16][]int16, chmask []uint16, positions []uint16) {
+	for i, elecID := range chmask {
+		position := positions[i]
+		wf := waveforms[elecID]
+		wfPointers[position] = &wf
+	}
 }
 
 func decodeChargeIndiaSipmCompressed(data []uint16, position int,
-	waveforms map[uint16][]int16, current_bit *int, huffman *HuffmanNode,
-	channelMask []uint16, last_values map[uint16]int16, time uint32) int {
+	waveforms []*[]int16, current_bit *int, huffman *HuffmanNode,
+	channelMask []uint16, last_values []int16, time uint32) int {
 
 	var dataword uint32 = 0
 
@@ -271,12 +300,8 @@ func decodeChargeIndiaSipmCompressed(data []uint16, position int,
 			position++
 			*current_bit += 16
 		}
-
 		// Pack two 16-bit words into a 32-bit word in the correct order
-		dataU8 := make([]byte, 4)
-		binary.BigEndian.PutUint16(dataU8[0:2], data[position])
-		binary.BigEndian.PutUint16(dataU8[2:4], data[position+1])
-		dataword = binary.BigEndian.Uint32(dataU8)
+		dataword = (uint32(data[position]) << 16) | uint32(data[position+1])
 
 		// Get previous value
 		previous := last_values[channelID]
@@ -287,7 +312,9 @@ func decodeChargeIndiaSipmCompressed(data []uint16, position int,
 		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x\n", channelID, time, wfvalue)
 
 		//Save data in Digits
-		waveforms[channelID][time] = wfvalue
+		//waveforms[channelID][time] = wfvalue
+		waveform := *waveforms[channelID]
+		waveform[time] = wfvalue
 	}
 
 	if *current_bit < 15 {
@@ -296,14 +323,6 @@ func decodeChargeIndiaSipmCompressed(data []uint16, position int,
 		position++ // We are in the first word
 	}
 	return position
-}
-
-func initializeLastValues(lastValues map[uint16]int16, channelMask []uint16) {
-	for _, channelID := range channelMask {
-		if _, exists := lastValues[channelID]; !exists {
-			lastValues[channelID] = 0
-		}
-	}
 }
 
 func initializeWaveforms(waveforms map[uint16][]int16, channelMask []uint16, bufferSamples uint32) {

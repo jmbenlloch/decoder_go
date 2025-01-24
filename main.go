@@ -56,59 +56,77 @@ func main() {
 	defer writer.Close()
 
 	jobs := make(chan WorkerData, configuration.NumWorkers)
-	results := make(chan EventType, 1000)
+	results := make(chan EventType, configuration.NumWorkers)
 
 	for w := 1; w <= configuration.NumWorkers; w++ {
 		go worker(w, jobs, results)
 	}
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		fmt.Println("Error getting file info:", err)
-		return
-	}
-	fileSize := fileInfo.Size()
-	fmt.Println("File size in bytes:", fileSize)
-	dataRead := make([]byte, fileSize)
-	nRead, err := file.Read(dataRead)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return
-	}
-	fmt.Println("Bytes read:", nRead)
+	//fileInfo, err := file.Stat()
+	//if err != nil {
+	//	fmt.Println("Error getting file info:", err)
+	//	return
+	//}
+	//fileSize := fileInfo.Size()
+	//fmt.Println("File size in bytes:", fileSize)
+	//dataRead := make([]byte, fileSize)
+	//nRead, err := file.Read(dataRead)
+	//if err != nil {
+	//	fmt.Println("Error reading file:", err)
+	//	return
+	//}
+	//fmt.Println("Bytes read:", nRead)
 	//data = &dataRead
 
 	evtCount := countEvents(file)
+	evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
+	fmt.Println("Number of events:", evtCount)
 
 	start := time.Now()
 	go sendEventsToWorkers(file, jobs, configuration)
 
 	var totalTime int64 = 0
 
-	evtsProcessed := 0
-	for event := range results {
-		fmt.Println("Processed event: ", evtsProcessed, event.EventID, evtCount)
-		evtsProcessed++
+	if evtsToRead > 0 {
+		evtsProcessed := 0
+		for event := range results {
+			fmt.Println("Processed event: ", evtsProcessed, event.EventID, evtCount)
 
-		start := time.Now()
-		//if configuration.SplitTrg {
-		//	switch int(event.TriggerType) {
-		//	case configuration.TrgCode1:
-		//		writer.WriteEvent(&event)
-		//	case configuration.TrgCode2:
-		//		writer2.WriteEvent(&event)
-		//	}
-		//} else {
-		//	writer.WriteEvent(&event)
-		//}
+			start := time.Now()
+			if configuration.WriteData {
+				if configuration.SplitTrg {
+					switch int(event.TriggerType) {
+					case configuration.TrgCode1:
+						writer.WriteEvent(&event)
+					case configuration.TrgCode2:
+						writer2.WriteEvent(&event)
+					}
+				} else {
+					writer.WriteEvent(&event)
+				}
+			}
 
-		duration := time.Since(start)
-		totalTime += duration.Milliseconds()
+			evtsProcessed++
+			if evtsProcessed >= evtsToRead {
+				break
+			}
+
+			duration := time.Since(start)
+			totalTime += duration.Milliseconds()
+		}
 	}
 	fmt.Println("Total time writing: ", totalTime)
 	duration := time.Since(start)
 	fmt.Println("Total time : ", duration.Milliseconds())
 	close(results)
+}
+
+func numberOfEventsToProcess(fileEvtCount int, skipEvts int, maxEvtCount int) int {
+	evtsToRead := maxEvtCount - skipEvts
+	if evtsToRead > fileEvtCount {
+		evtsToRead = fileEvtCount
+	}
+	return evtsToRead
 }
 
 func countEvents(file *os.File) int {
@@ -169,6 +187,12 @@ func sendEventsToWorkers(file *os.File, jobs chan<- WorkerData, configuration Co
 			continue
 		}
 		//event := readGDC(eventData, header)
+		//fmt.Println("Event ID:", EventIdGetNbInRun(header.EventId))
+		//startTime := time.Now()
+		//_ = readGDC(eventData, header)
+		//duration := time.Since(startTime)
+		//_ = duration
+		//	fmt.Printf("Time reading GDC: %d\n", duration.Milliseconds())
 		jobs <- WorkerData{Data: eventData, Header: header}
 	}
 	close(jobs)
@@ -229,7 +253,11 @@ func readGDC(eventData []byte, header EventHeaderStruct) EventType {
 	// Read LDCs
 	position := 0
 	for {
+		startTime := time.Now()
 		nRead := readLDC(eventData, position, &event, sipmPayloads)
+		duration := time.Since(startTime)
+		_ = duration
+		//fmt.Printf("Time reading LDC: %d\n", duration.Milliseconds())
 		// Next LDC
 		position += nRead
 		//fmt.Printf("\tPosition: %d, Length of eventData: %d\n", position, len(eventData))
@@ -297,7 +325,11 @@ func readLDC(eventData []byte, position int, event *EventType, sipmPayloads map[
 	startLDCPayload := position + int(header.EventHeadSize)
 	startPosition := 0
 	for {
+		startTime := time.Now()
 		nRead := readEquipment(eventData[startLDCPayload:], startPosition, header, event, sipmPayloads)
+		duration := time.Since(startTime)
+		_ = duration
+		//fmt.Printf("\tTime reading equipment: %d\n", duration.Milliseconds())
 		// Next equipment
 		startPosition += nRead
 		if startPosition+int(header.EventHeadSize) >= int(header.EventSize) {
@@ -365,7 +397,10 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 		case 0:
 			//fmt.Println("PMT FEC")
 			if configuration.ReadPMTs {
+				//start := time.Now()
 				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				//duration := time.Since(start)
+				//fmt.Printf("Time reading PMT FEC %d: %d\n", evtFormat.FecID, duration.Milliseconds())
 			}
 		case 1:
 			//fmt.Println("SiPM FEC")

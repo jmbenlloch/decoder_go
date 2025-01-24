@@ -26,6 +26,7 @@ type Configuration struct {
 	Passwd      string `json:"pass"`
 	DBName      string `json:"dbname"`
 	NumWorkers  int    `json:"num_workers"`
+	WriteData   bool   `json:"write_data"`
 }
 
 func LoadConfiguration(filename string) (Configuration, error) {
@@ -49,6 +50,7 @@ func LoadConfiguration(filename string) (Configuration, error) {
 	config.Passwd = "readonly"
 	config.DBName = "NEXT100"
 	config.NumWorkers = 1
+	config.WriteData = true
 
 	data, err := os.ReadFile(filename)
 	if err != nil {

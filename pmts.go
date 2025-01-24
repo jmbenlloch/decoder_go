@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 )
 
@@ -52,8 +51,9 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 	var nextFT int32 = -1 //At start we don't know next FT value
 	var nextFThm int32 = -1
 
-	channelMask := pmtsChannelMask(evtFormat)
+	channelMask, chPositions := pmtsChannelMask(evtFormat)
 	initializeWaveforms(event.PmtWaveforms, channelMask, bufferSamples)
+	wfPointers := computePmtWaveformPointerArray(event.PmtWaveforms, channelMask, chPositions)
 
 	// Write pedestal
 	if Baseline {
@@ -77,8 +77,8 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 			if time == int(bufferSamples) {
 				break
 			}
-			position = decodeChargeIndiaPmtCompressed(data, position, event.PmtWaveforms,
-				&current_bit, huffmanCodesPmts, channelMask, uint32(time))
+			position = decodeChargeIndiaPmtCompressed(data, position, wfPointers,
+				&current_bit, huffmanCodesPmts, chPositions, uint32(time))
 		} else {
 			var FT int32 = int32(data[position]) & 0x0FFFF
 			position++
@@ -91,7 +91,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 					break
 				}
 			}
-			position = decodeCharge(data, position, event.PmtWaveforms, channelMask, uint32(time))
+			position = decodeCharge(data, position, event.PmtWaveforms, chPositions, uint32(time))
 		}
 	}
 }
@@ -133,7 +133,7 @@ func computeNextFThm(nextFT *int32, nextFThm *int32, evtFormat *EventFormat) {
 	//}
 }
 
-func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms map[uint16][]int16,
+func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms []*[]int16,
 	current_bit *int, huffman *HuffmanNode, channelMask []uint16, time uint32) int {
 	var dataword uint32 = 0
 
@@ -142,33 +142,48 @@ func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms map[u
 			position++
 			*current_bit += 16
 		}
-
 		// Pack two 16-bit words into a 32-bit word in the correct order
-		dataU8 := make([]byte, 4)
-		binary.BigEndian.PutUint16(dataU8[0:2], data[position])
-		binary.BigEndian.PutUint16(dataU8[2:4], data[position+1])
-		dataword = binary.BigEndian.Uint32(dataU8)
+		dataword = (uint32(data[position]) << 16) | uint32(data[position+1])
 
 		// Get previous value
+		waveform := *waveforms[channelID%100]
 		var previous int16 = 0
 		if time > 0 {
-			previous = waveforms[channelID][time-1]
+			previous = waveform[time-1]
 		}
 
 		var control_code int32 = 123456
 		wfvalue := int16(decode_compressed_value(int32(previous), dataword, control_code, current_bit, huffman))
+		_ = wfvalue
+		_ = channelID
 
 		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x\n", channelID, time, wfvalue)
 
-		waveforms[channelID][time] = wfvalue
+		//waveforms[channelID][time] = wfvalue
+		waveform[time] = wfvalue
 	}
 	return position
 }
 
-func pmtsChannelMask(evtFormat *EventFormat) []uint16 {
+func computePmtWaveformPointerArray(waveforms map[uint16][]int16, chmask []uint16, positions []uint16) []*[]int16 {
+	MAX_PMTs_PER_FEC := 12
+	wfPointers := make([]*[]int16, MAX_PMTs_PER_FEC)
+	for i, elecID := range chmask {
+		position := positions[i]
+		wf := waveforms[elecID]
+		wfPointers[position] = &wf
+	}
+	return wfPointers
+}
+
+func pmtsChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
 	var elecID uint16
 
 	channelMaskVec := make([]uint16, 0)
+	// To avoid using the map for every waveform sample we are keeping another
+	// vector with the pointers to the waveforms. This positions vector indicates
+	// the position of the waveform in the waveforms pointer array.
+	positions := make([]uint16, 0)
 
 	var t uint16
 	for t = 0; t < 16; t++ {
@@ -177,11 +192,18 @@ func pmtsChannelMask(evtFormat *EventFormat) []uint16 {
 			elecID = computePmtElecID(evtFormat.FecID, t, evtFormat.FWVersion)
 			// printf("channelmask: elecid: %d\tpmtid: %d\n", ElecID, pmtID);
 			channelMaskVec = append(channelMaskVec, elecID)
+			positions = append(positions, computePmtPosition(elecID))
 		}
 	}
 
 	//fmt.Printf("Channel mask is %v\n", channelMaskVec)
-	return channelMaskVec
+	return channelMaskVec, positions
+}
+
+func computePmtPosition(elecID uint16) uint16 {
+	position := elecID % 100 / 2
+	//fmt.Println("ElecID is ", elecID, " Position is ", position)
+	return position
 }
 
 func computePmtElecID(fecID uint16, channel uint16, fwversion uint16) uint16 {
