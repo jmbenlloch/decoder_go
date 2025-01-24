@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"time"
 )
 
 type WorkerData struct {
@@ -16,4 +18,50 @@ func worker(id int, jobs <-chan WorkerData, results chan<- EventType) {
 		event := readGDC(event.Data, event.Header)
 		results <- event
 	}
+}
+
+func sendEventsToWorkers(fileReader *FileReader, jobs chan<- WorkerData) {
+	for {
+		header, eventData, err := fileReader.getNextEvent()
+		fmt.Printf("Reading event %d\n", EventIdGetNbInRun(header.EventId))
+		if err != nil {
+			fmt.Println("Error reading event:", err)
+			break
+		}
+		if err == io.EOF {
+			break
+		}
+		jobs <- WorkerData{Data: eventData, Header: header}
+	}
+	close(jobs)
+}
+
+func processWorkerResults(results chan EventType, writer *Writer, writer2 *Writer, evtsToRead int) {
+	evtsProcessed := 0
+	var totalTime int64 = 0
+	for event := range results {
+		fmt.Println("Processed event: ", evtsProcessed, event.EventID)
+		start := time.Now()
+		if configuration.WriteData {
+			if configuration.SplitTrg {
+				switch int(event.TriggerType) {
+				case configuration.TrgCode1:
+					writer.WriteEvent(&event)
+				case configuration.TrgCode2:
+					writer2.WriteEvent(&event)
+				}
+			} else {
+				writer.WriteEvent(&event)
+			}
+		}
+
+		evtsProcessed++
+		if evtsProcessed >= evtsToRead {
+			break
+		}
+
+		duration := time.Since(start)
+		totalTime += duration.Milliseconds()
+	}
+	fmt.Println("Total time writing: ", totalTime)
 }

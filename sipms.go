@@ -154,9 +154,9 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 					var chMask, chPositions []uint16
 					chMask, chPositions, position = sipmChannelMask(payload, position, febID)
 					chMasks[febID] = chPositions
-					//					fmt.Printf("time : %d %t\n", time, ZeroSuppression)
-					//					fmt.Printf("Channel mask: %v\n", chMask)
-					//					fmt.Println("Channel positions: ", chPositions)
+					//fmt.Printf("time : %d %t\n", time, ZeroSuppression)
+					//fmt.Printf("Channel mask: %v\n", chMask)
+					//fmt.Println("Channel positions: ", chPositions)
 					initializeWaveforms(event.SipmWaveforms, chMask, bufferSamples)
 					computeSipmWaveformPointerArray(wfPointers, event.SipmWaveforms, chMask, chPositions)
 				}
@@ -277,7 +277,7 @@ func sipmChannelMask(data []uint16, position int, febID uint16) ([]uint16, []uin
 }
 
 func computeSipmPosition(elecID uint16) uint16 {
-	position := (elecID / 64) + (elecID % 64)
+	position := ((elecID/1000)-1)*64 + elecID%1000
 	return position
 }
 

@@ -134,13 +134,21 @@ func (w *Writer) WriteEvent(event *EventType) {
 	nBlrs = len(event.BlrWaveforms)
 
 	if nPmts > 0 {
-		randomPmt := maps.Values(event.PmtWaveforms)[0]
-		pmtSamples = len(randomPmt)
+		if len(event.PmtWaveforms) > 0 {
+			randomPmt := maps.Values(event.PmtWaveforms)[0]
+			pmtSamples = len(randomPmt)
+		} else {
+			pmtSamples = 1
+		}
 	}
 
 	if nSipms > 0 {
-		randomSipm := maps.Values(event.SipmWaveforms)[0]
-		sipmSamples = len(randomSipm)
+		if len(event.SipmWaveforms) > 0 {
+			randomSipm := maps.Values(event.SipmWaveforms)[0]
+			sipmSamples = len(randomSipm)
+		} else {
+			sipmSamples = 1
+		}
 	}
 
 	if !w.FirstEvt {
@@ -310,4 +318,20 @@ func (w *Writer) writeTriggerConfiguration(params TriggerData) {
 	}
 	toWrite := entries[:fieldsToWrite]
 	writeArrayToTable(w.TriggerParamsTable, &toWrite)
+}
+
+func processDecodedEvent(event EventType, configuration Configuration,
+	writer *Writer, writer2 *Writer) {
+	if configuration.WriteData {
+		if configuration.SplitTrg {
+			switch int(event.TriggerType) {
+			case configuration.TrgCode1:
+				writer.WriteEvent(&event)
+			case configuration.TrgCode2:
+				writer2.WriteEvent(&event)
+			}
+		} else {
+			writer.WriteEvent(&event)
+		}
+	}
 }

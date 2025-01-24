@@ -263,3 +263,43 @@ func writePmtPedestals(evtFormat *EventFormat, channelMask []uint16, baselines m
 		baselines[elecID] = evtFormat.Baselines[baseline_index]
 	}
 }
+
+func processPmtIds(event *EventType, configuration Configuration) {
+	extTriggerCh := configuration.ExtTrigger
+	for elecID, waveform := range event.PmtWaveforms {
+		// Check external trigger
+		if elecID == uint16(extTriggerCh) {
+			event.ExtTrgWaveform = &waveform
+			delete(event.PmtWaveforms, elecID)
+			delete(event.Baselines, elecID)
+		}
+
+		// Check dual channels
+		// dual channels are used to send the original waveform and the BLR one
+		// They appear as two different channels, but the signal comes from the same
+		// physical channel
+		// 100 - 111 -> 100 - 111 Real
+		// 112 - 123 -> 100 - 111 Dual
+		// 200 - 211 -> 200 - 211 Real
+		// 212 - 223 -> 200 - 211 Dual
+		// 300 - 311 -> 300 - 311 Real
+		// 312 - 323 -> 300 - 311 Dual
+		// 400 - 411 -> 400 - 411 Real
+		// 412 - 423 -> 400 - 411 Dual
+		// 500 - 511 -> 500 - 511 Real
+		// 512 - 523 -> 500 - 511 Dual
+		// 600 - 611 -> 600 - 611 Real
+		// 612 - 623 -> 600 - 611 Dual
+		// 700 - 711 -> 700 - 711 Real
+		// 712 - 723 -> 700 - 711 Dual
+
+		// Dual channel
+		if elecID%100 >= 12 {
+			newid := elecID - 12
+			event.BlrWaveforms[newid] = waveform
+			event.BlrBaselines[newid] = event.Baselines[elecID]
+			delete(event.PmtWaveforms, elecID)
+			delete(event.Baselines, elecID)
+		}
+	}
+}
