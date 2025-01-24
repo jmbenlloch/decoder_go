@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 	"unsafe"
@@ -47,6 +48,7 @@ func main() {
 	}
 	defer file.Close()
 
+	// Create writers
 	var writer, writer2 *Writer
 	writer = NewWriter(configuration.FileOut)
 	if configuration.SplitTrg {
@@ -54,14 +56,6 @@ func main() {
 		defer writer2.Close()
 	}
 	defer writer.Close()
-
-	jobs := make(chan WorkerData, configuration.NumWorkers)
-	results := make(chan EventType, configuration.NumWorkers)
-
-	for w := 1; w <= configuration.NumWorkers; w++ {
-		go worker(w, jobs, results)
-	}
-
 	//fileInfo, err := file.Stat()
 	//if err != nil {
 	//	fmt.Println("Error getting file info:", err)
@@ -82,43 +76,120 @@ func main() {
 	evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
 	fmt.Println("Number of events:", evtCount)
 
+	fileReader := NewFileReader(file)
+
 	start := time.Now()
-	go sendEventsToWorkers(file, jobs, configuration)
+	if configuration.Parallel {
+		jobs := make(chan WorkerData, configuration.NumWorkers)
+		results := make(chan EventType, configuration.NumWorkers)
 
-	var totalTime int64 = 0
+		for w := 1; w <= configuration.NumWorkers; w++ {
+			go worker(w, jobs, results)
+		}
+		go sendEventsToWorkers(fileReader, jobs)
 
-	if evtsToRead > 0 {
-		evtsProcessed := 0
-		for event := range results {
-			fmt.Println("Processed event: ", evtsProcessed, event.EventID, evtCount)
-
-			start := time.Now()
-			if configuration.WriteData {
-				if configuration.SplitTrg {
-					switch int(event.TriggerType) {
-					case configuration.TrgCode1:
-						writer.WriteEvent(&event)
-					case configuration.TrgCode2:
-						writer2.WriteEvent(&event)
-					}
-				} else {
-					writer.WriteEvent(&event)
-				}
-			}
-
-			evtsProcessed++
-			if evtsProcessed >= evtsToRead {
+		if evtsToRead > 0 {
+			processResults(results, writer, writer2, evtsToRead)
+		}
+		close(results)
+	} else {
+		for {
+			fmt.Println("Reading event main")
+			header, eventData, err := fileReader.getNextEvent()
+			fmt.Printf("Reading event %d\n", EventIdGetNbInRun(header.EventId))
+			if err != nil {
+				fmt.Println("Error reading event:", err)
 				break
 			}
-
-			duration := time.Since(start)
-			totalTime += duration.Milliseconds()
+			if err == io.EOF {
+				break
+			}
+			event := readGDC(eventData, header)
+			processDecodedEvent(event, configuration, writer, writer2)
 		}
 	}
-	fmt.Println("Total time writing: ", totalTime)
 	duration := time.Since(start)
 	fmt.Println("Total time : ", duration.Milliseconds())
-	close(results)
+}
+
+func processDecodedEvent(event EventType, configuration Configuration,
+	writer *Writer, writer2 *Writer) {
+	if configuration.WriteData {
+		if configuration.SplitTrg {
+			switch int(event.TriggerType) {
+			case configuration.TrgCode1:
+				writer.WriteEvent(&event)
+			case configuration.TrgCode2:
+				writer2.WriteEvent(&event)
+			}
+		} else {
+			writer.WriteEvent(&event)
+		}
+	}
+}
+
+type FileReader struct {
+	File     *os.File
+	EvtCount int
+}
+
+func NewFileReader(file *os.File) *FileReader {
+	return &FileReader{File: file, EvtCount: -1}
+}
+
+func (f *FileReader) getNextEvent() (EventHeaderStruct, []byte, error) {
+	fmt.Println("Reading event")
+	header, eventData, err := readEvent(f.File)
+	fmt.Println("Header:", header)
+	if err != nil {
+		fmt.Println("Error reading event:", err)
+		return header, nil, err
+	}
+	if !validEvent(header) {
+		fmt.Println("Invalid event")
+		return f.getNextEvent()
+	}
+	f.EvtCount++
+	if f.EvtCount >= configuration.MaxEvents {
+		fmt.Println("Max events reached")
+		return header, nil, io.EOF
+	}
+	if f.EvtCount < configuration.Skip {
+		fmt.Println("Skipping event")
+		return f.getNextEvent()
+	}
+	fmt.Println("Event count:", f.EvtCount)
+	return header, eventData, nil
+}
+
+func processResults(results chan EventType, writer *Writer, writer2 *Writer, evtsToRead int) {
+	evtsProcessed := 0
+	var totalTime int64 = 0
+	for event := range results {
+		fmt.Println("Processed event: ", evtsProcessed, event.EventID)
+		start := time.Now()
+		if configuration.WriteData {
+			if configuration.SplitTrg {
+				switch int(event.TriggerType) {
+				case configuration.TrgCode1:
+					writer.WriteEvent(&event)
+				case configuration.TrgCode2:
+					writer2.WriteEvent(&event)
+				}
+			} else {
+				writer.WriteEvent(&event)
+			}
+		}
+
+		evtsProcessed++
+		if evtsProcessed >= evtsToRead {
+			break
+		}
+
+		duration := time.Since(start)
+		totalTime += duration.Milliseconds()
+	}
+	fmt.Println("Total time writing: ", totalTime)
 }
 
 func numberOfEventsToProcess(fileEvtCount int, skipEvts int, maxEvtCount int) int {
@@ -161,7 +232,6 @@ func countEvents(file *os.File) int {
 	}
 	// Go back to the beginning of the file
 	file.Seek(0, 0)
-	fmt.Println("Number of events:", evtCount)
 	return evtCount
 }
 
@@ -169,30 +239,17 @@ func validEvent(header EventHeaderStruct) bool {
 	return header.EventType == PHYSICS_EVENT || header.EventType == CALIBRATION_EVENT
 }
 
-func sendEventsToWorkers(file *os.File, jobs chan<- WorkerData, configuration Configuration) {
-	evtCount := -1
+func sendEventsToWorkers(fileReader *FileReader, jobs chan<- WorkerData) {
 	for {
-		header, eventData, err := readEvent(file)
+		header, eventData, err := fileReader.getNextEvent()
+		fmt.Printf("Reading event %d\n", EventIdGetNbInRun(header.EventId))
 		if err != nil {
+			fmt.Println("Error reading event:", err)
 			break
 		}
-		if !validEvent(header) {
-			continue
-		}
-		evtCount++
-		if evtCount >= configuration.MaxEvents {
+		if err == io.EOF {
 			break
 		}
-		if evtCount < configuration.Skip {
-			continue
-		}
-		//event := readGDC(eventData, header)
-		//fmt.Println("Event ID:", EventIdGetNbInRun(header.EventId))
-		//startTime := time.Now()
-		//_ = readGDC(eventData, header)
-		//duration := time.Since(startTime)
-		//_ = duration
-		//	fmt.Printf("Time reading GDC: %d\n", duration.Milliseconds())
 		jobs <- WorkerData{Data: eventData, Header: header}
 	}
 	close(jobs)
