@@ -21,6 +21,17 @@ const (
 	PMT
 )
 
+func (s SensorType) String() string {
+	switch s {
+	case SiPM:
+		return "SiPM"
+	case PMT:
+		return "PMT"
+	default:
+		return "Unknown"
+	}
+}
+
 type HuffmanCode struct {
 	Value int
 	Code  string
@@ -36,14 +47,19 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 	switch sensor {
 	case SiPM:
 		query = "SELECT value, code from HuffmanCodesSipm WHERE MinRun <= %d and MaxRun >= %d"
-		fmt.Println("SiPM Huffman codes read from DB")
 	case PMT:
 		query = "SELECT value, code from HuffmanCodesPmt WHERE MinRun <= %d and MaxRun >= %d"
-		fmt.Println("PMTHuffman codes read from DB")
 	}
 
 	query = fmt.Sprintf(query, runNumber, runNumber)
-	fmt.Println("Query: ", query)
+	if VerbosityLevel > 0 {
+		message := fmt.Sprintf("Reading %v Huffman Codes from database", sensor)
+		InfoLog.Info(message, "module", "database")
+	}
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Query: %s", query)
+		InfoLog.Info(message, "module", "database")
+	}
 	rows, err := db.Queryx(query)
 	if err != nil {
 		fmt.Println("Error querying database: ", err)
@@ -68,8 +84,14 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
 	query := "SELECT ElecID, SensorID FROM ChannelMapping WHERE MinRun <= %d and MaxRun >= %d ORDER BY SensorID"
 	query = fmt.Sprintf(query, runNumber, runNumber)
-	fmt.Println("Query: ", query)
-	fmt.Println("Channel mapping read from DB")
+
+	if VerbosityLevel > 0 {
+		InfoLog.Info("Channel mapping read from DB", "module", "database")
+	}
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Query: %s", query)
+		InfoLog.Info(message, "module", "database")
+	}
 
 	rows, err := db.Queryx(query)
 	if err != nil {

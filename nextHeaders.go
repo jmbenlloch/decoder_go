@@ -1,10 +1,17 @@
 package main
 
+import "fmt"
+
 func ReadCommonHeader(data []uint16) EventFormat {
 	position := 0
 	evtFormat := EventFormat{}
+
 	sequenceCounter, position := readSeqCounter(data, position)
-	//fmt.Println("Sequence Counter:", sequenceCounter)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Sequence counter: %d", sequenceCounter)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
+
 	if sequenceCounter == 0 {
 		position = readFormatID(data, position, &evtFormat)
 		position = readWordCount(data, position, &evtFormat)
@@ -82,13 +89,22 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 	FWVersion := data[position] & 0x0FFFF
 	position++
 
-	//fmt.Println("FecType:", FecType)
-	//fmt.Println("ZeroSuppression:", ZeroSuppression)
-	//fmt.Println("CompressedData:", CompressedData)
-	//fmt.Println("Baseline:", Baseline)
-	//fmt.Println("DualModeBit:", DualModeBit)
-	//fmt.Println("ErrorBit:", ErrorBit)
-	//fmt.Println("FWVersion:", FWVersion)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("FecType: 0x%02x", FecType)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Zero Suppression: %d", ZeroSuppression)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Compressed Data: %d", CompressedData)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Baseline: %d", Baseline)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Dual Mode: %d", DualModeBit)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Error bit: %d", ErrorBit)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("FW version: %d", FWVersion)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 
 	evtFormat.FecType = FecType
 	evtFormat.ZeroSuppression = ZeroSuppression > 0
@@ -104,7 +120,10 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 func readWordCount(data []uint16, position int, evtFormat *EventFormat) int {
 	WordCounter := data[position] & 0x0FFFF
 	position++
-	//fmt.Println("Word Counter:", WordCounter)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Word count: %d", WordCounter)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 	evtFormat.WordCount = WordCounter
 	return position
 }
@@ -113,8 +132,12 @@ func readEventID(data []uint16, position int, evtFormat *EventFormat) int {
 	TriggerType := data[position] & 0x000F
 	TriggerCounter := (uint32(data[position]&0x0FFF0) << 12) + (uint32(data[position+1]) & 0x0FFFF)
 	position += 2
-	//fmt.Println("Trigger Type:", TriggerType)
-	//fmt.Println("Trigger Counter:", TriggerCounter)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Trigger type: %d", TriggerType)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Trigger Counter: %d", TriggerCounter)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 	evtFormat.TriggerType = TriggerType
 	evtFormat.TriggerCounter = TriggerCounter
 	return position
@@ -147,11 +170,18 @@ func readEventConfJuliett(data []uint16, position int, evtFormat *EventFormat) i
 	evtFormat.PreTrigger2 = PreTriggerSamples2
 	evtFormat.ChannelMask = ChannelMask
 
-	//fmt.Println("Buffer Samples:", BufferSamples)
-	//fmt.Println("PreTrigger Samples:", PreTriggerSamples)
-	//fmt.Println("Buffer Samples2:", BufferSamples2)
-	//fmt.Println("PreTrigger Samples2:", PreTriggerSamples2)
-	//fmt.Println("Channel Mask:", ChannelMask)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Buffer samples: %d", BufferSamples)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Pretrigger samples: %d", PreTriggerSamples)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Buffer 2 samples: %d", BufferSamples2)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Pretrigger 2 samples: %d", PreTriggerSamples2)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("Channel mask: 0x%04x", ChannelMask)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 	return position
 }
 
@@ -200,7 +230,10 @@ func readIndiaBaselines(data []uint16, position int, evtFormat *EventFormat) int
 
 	evtFormat.Baselines = baselines
 
-	//fmt.Println("Baselines:", baselines)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Baselines: %v", baselines)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 	return position
 }
 
@@ -209,8 +242,12 @@ func readIndiaFecID(data []uint16, position int, evtFormat *EventFormat) int {
 	FecID := (data[position] & 0x0FFE0) >> 5
 	position++
 
-	//fmt.Println("Number of Channels:", NumberOfChannels)
-	//fmt.Println("Fec ID:", FecID)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Number of channels: %d", NumberOfChannels)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("FEC ID: %d, 0x%02x", FecID, FecID)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 
 	evtFormat.NumberOfChannels = NumberOfChannels
 	evtFormat.FecID = FecID
@@ -235,8 +272,12 @@ func readCTandFTh(data []uint16, position int, evtFormat *EventFormat) int {
 	FTBit := int32((data[position] & 0x8000) >> 15)
 	position++
 
-	//fmt.Println("Timestamp:", Timestamp)
-	//fmt.Println("FTBit:", FTBit)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Timestamp: %d", Timestamp)
+		InfoLog.Info(message, "module", "nextHeader")
+		message = fmt.Sprintf("FTBit: %d", FTBit)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 
 	evtFormat.Timestamp = Timestamp
 	evtFormat.FTBit = FTBit
@@ -247,7 +288,10 @@ func readCTandFTh(data []uint16, position int, evtFormat *EventFormat) int {
 func readFTl(data []uint16, position int, evtFormat *EventFormat) int {
 	TriggerFT := data[position] & 0x0FFFF
 	position++
-	//fmt.Println("TriggerFT:", TriggerFT)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("TriggerFT: %04x", TriggerFT)
+		InfoLog.Info(message, "module", "nextHeader")
+	}
 
 	evtFormat.TriggerFT = TriggerFT
 

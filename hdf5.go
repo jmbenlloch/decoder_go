@@ -96,8 +96,8 @@ func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, ch
 
 	plistArray.SetChunk(chunks)
 	// Set compression level
-	plistArray.SetDeflate(4)
-	//hdf5.ConfigureBloscFilter(plistArray, 9)
+	//plistArray.SetDeflate(4)
+	hdf5.ConfigureBloscFilter(plistArray, 9)
 
 	// create the memory data type
 	//dtypeArray, err := hdf5.NewDatatypeFromValue(int16(7))
@@ -141,8 +141,8 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 	chunks := []uint{32768}
 	plist.SetChunk(chunks)
 	// Set compression level
-	plist.SetDeflate(4)
-	//hdf5.ConfigureBloscFilter(plist, 9)
+	//plist.SetDeflate(4)
+	hdf5.ConfigureBloscFilter(plist, 9)
 
 	// create the memory data type
 	dtype, err := hdf5.NewDatatypeFromValue(datatype)

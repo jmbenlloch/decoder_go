@@ -28,12 +28,21 @@ func (f *FileReader) getNextEvent() (EventHeaderStruct, []byte, error) {
 	}
 	f.EvtCount++
 	if f.EvtCount >= configuration.MaxEvents {
-		fmt.Println("Max events reached")
+		if VerbosityLevel > 0 {
+			InfoLog.Info("Max events reached", "module", "fileReader")
+		}
 		return header, nil, io.EOF
 	}
 	if f.EvtCount < configuration.Skip {
-		fmt.Println("Skipping event")
+		if VerbosityLevel > 0 {
+			message := fmt.Sprintf("Skipping event %d with ID %d", f.EvtCount, EventIdGetNbInRun(header.EventId))
+			InfoLog.Info(message, "module", "fileReader")
+		}
 		return f.getNextEvent()
+	}
+	if VerbosityLevel > 0 {
+		message := fmt.Sprintf("Reading event %d with ID %d", f.EvtCount, EventIdGetNbInRun(header.EventId))
+		InfoLog.Info(message, "module", "fileReader")
 	}
 	return header, eventData, nil
 }
@@ -50,20 +59,25 @@ func countEvents(file *os.File) int {
 			break
 		}
 		if nRead == 0 {
-			fmt.Println("End of file")
+			if VerbosityLevel > 1 {
+				InfoLog.Debug("End of file")
+			}
 			break
 		}
 
 		headerReader := bytes.NewReader(headerBinary)
 		binary.Read(headerReader, binary.LittleEndian, &header)
-		fmt.Printf("Evt id: %d. GDC %d, LDC %d\n", header.EventId, header.EventGdcId, header.EventLdcId)
-		//fmt.Println("Header:", header)
+		if VerbosityLevel > 1 {
+			message := fmt.Sprintf("Evt id: %d. GDC %d", EventIdGetNbInRun(header.EventId), header.EventGdcId)
+			InfoLog.Debug(message, "module", "evtCounter")
+		}
 		payloadSize := uint32(header.EventSize) - uint32(headerSize)
-		//fmt.Println("Payload size:", payloadSize)
-		//fmt.Println("event type: ", header.EventType)
 		file.Seek(int64(payloadSize), 1)
 
 		if !validEvent(header) {
+			if VerbosityLevel > 1 {
+				InfoLog.Info("Skipping invalid event: %d\n", EventIdGetNbInRun(header.EventId))
+			}
 			continue
 		}
 		evtCount++

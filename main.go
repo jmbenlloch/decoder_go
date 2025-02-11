@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"time"
 
@@ -18,8 +19,21 @@ var sensorsMap *SensorsMap
 var dbConn *sqlx.DB
 var configuration Configuration
 
-//var data *[]byte
-//var globalPosition int = 0
+var (
+	InfoLog        *slog.Logger
+	ErrorLog       *slog.Logger
+	VerbosityLevel int
+)
+
+func init() {
+	opts := &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}
+	handlerStdOut := NewHandler(os.Stdout, opts)
+	handlerStdErr := slog.NewJSONHandler(os.Stderr, opts)
+	InfoLog = slog.New(handlerStdOut)
+	ErrorLog = slog.New(handlerStdErr)
+}
 
 func main() {
 	configFilename := flag.String("config", "", "Configuration file path")
@@ -30,6 +44,14 @@ func main() {
 	if err != nil {
 		fmt.Println("Error reading configuration file: ", err)
 		return
+	}
+	VerbosityLevel = configuration.Verbosity
+	if VerbosityLevel > 0 {
+		message := fmt.Sprintf("Reading configuration file: %s", *configFilename)
+		InfoLog.Info(message, "module", "main")
+	}
+	if VerbosityLevel > 0 {
+		printConfiguration(configuration, InfoLog)
 	}
 
 	dbConn, err = ConnectToDatabase(configuration.User, configuration.Passwd, configuration.Host, configuration.DBName)
@@ -53,25 +75,13 @@ func main() {
 		defer writer2.Close()
 	}
 	defer writer.Close()
-	//fileInfo, err := file.Stat()
-	//if err != nil {
-	//	fmt.Println("Error getting file info:", err)
-	//	return
-	//}
-	//fileSize := fileInfo.Size()
-	//fmt.Println("File size in bytes:", fileSize)
-	//dataRead := make([]byte, fileSize)
-	//nRead, err := file.Read(dataRead)
-	//if err != nil {
-	//	fmt.Println("Error reading file:", err)
-	//	return
-	//}
-	//fmt.Println("Bytes read:", nRead)
-	//data = &dataRead
 
 	evtCount := countEvents(file)
 	evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
-	fmt.Println("Number of events:", evtCount)
+	if VerbosityLevel > 0 {
+		message := fmt.Sprintf("Number of events: %d", evtCount)
+		InfoLog.Info(message, "module", "main")
+	}
 
 	fileReader := NewFileReader(file)
 
@@ -86,13 +96,13 @@ func main() {
 		go sendEventsToWorkers(fileReader, jobs)
 
 		if evtsToRead > 0 {
+			// TODO: This should be modified to write in parallel trigger1 and trigger2
 			processWorkerResults(results, writer, writer2, evtsToRead)
 		}
 		close(results)
 	} else {
 		for {
 			header, eventData, err := fileReader.getNextEvent()
-			fmt.Printf("Reading event %d\n", EventIdGetNbInRun(header.EventId))
 			if err != nil {
 				fmt.Println("Error reading event:", err)
 				break

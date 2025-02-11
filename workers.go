@@ -12,6 +12,13 @@ type WorkerData struct {
 }
 
 func worker(id int, jobs <-chan WorkerData, results chan<- EventType) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Worker %d recovered from panic: %v\n", id, r)
+			results <- EventType{Error: true}
+		}
+	}()
+
 	for event := range jobs {
 		fmt.Printf("Worker %d processing event %d\n", id, event.Header.EventId)
 		//fmt.Println("Data size:", len(event.Data), "Header: ", event.Header)
@@ -39,10 +46,11 @@ func sendEventsToWorkers(fileReader *FileReader, jobs chan<- WorkerData) {
 func processWorkerResults(results chan EventType, writer *Writer, writer2 *Writer, evtsToRead int) {
 	evtsProcessed := 0
 	var totalTime int64 = 0
+	fmt.Println("Waiting for events")
 	for event := range results {
 		fmt.Println("Processed event: ", evtsProcessed, event.EventID)
 		start := time.Now()
-		if configuration.WriteData {
+		if configuration.WriteData && !event.Error {
 			if configuration.SplitTrg {
 				switch int(event.TriggerType) {
 				case configuration.TrgCode1:

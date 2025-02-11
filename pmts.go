@@ -43,10 +43,6 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 		//}
 	}
 
-	// Map elecID -> last_value (for decompression)
-	//lastValues := make(map[uint16]int32)
-	//chMasks := make(map[uint16][]uint16)
-
 	// Reading the payload
 	var nextFT int32 = -1 //At start we don't know next FT value
 	var nextFThm int32 = -1
@@ -65,10 +61,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 	//2x size per link and there are many FFFF at the end, which are the actual
 	//stop condition...
 	for true {
-		// timeinmus = timeinmus + CLOCK_TICK_;
 		time++
-		//fmt.Println("Time is ", time)
-
 		if Compression {
 			// Skip FTm
 			if time == 0 {
@@ -127,10 +120,10 @@ func computeNextFThm(nextFT *int32, nextFThm *int32, evtFormat *EventFormat) {
 		*nextFThm = *nextFT - int32(PreTrgSamples)
 	}
 
-	//if( verbosity_ >= 3 ){
-	//	_log->debug("nextFThm: 0x{:05x}", *nextFThm);
-	//	_log->debug("nextFT: 0x{:05x}", *nextFT);
-	//}
+	if VerbosityLevel > 3 {
+		message := fmt.Sprintf("nextFThm: 0x%05x\tnextFT: 0x%05x", *nextFThm, *nextFT)
+		InfoLog.Info(message, "module", "pmts")
+	}
 }
 
 func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms []*[]int16,
@@ -154,12 +147,12 @@ func decodeChargeIndiaPmtCompressed(data []uint16, position int, waveforms []*[]
 
 		var control_code int32 = 123456
 		wfvalue := int16(decode_compressed_value(int32(previous), dataword, control_code, current_bit, huffman))
-		_ = wfvalue
-		_ = channelID
 
-		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x\n", channelID, time, wfvalue)
+		if VerbosityLevel > 3 {
+			message := fmt.Sprintf("ElecID %d, time %d, charge 0x%04x", channelID, time, wfvalue)
+			InfoLog.Info(message, "module", "pmts")
+		}
 
-		//waveforms[channelID][time] = wfvalue
 		waveform[time] = wfvalue
 	}
 	return position
@@ -190,13 +183,15 @@ func pmtsChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
 		active := CheckBit(evtFormat.ChannelMask, t)
 		if active {
 			elecID = computePmtElecID(evtFormat.FecID, t, evtFormat.FWVersion)
-			// printf("channelmask: elecid: %d\tpmtid: %d\n", ElecID, pmtID);
 			channelMaskVec = append(channelMaskVec, elecID)
 			positions = append(positions, computePmtPosition(elecID))
 		}
 	}
 
-	//fmt.Printf("Channel mask is %v\n", channelMaskVec)
+	if VerbosityLevel > 2 {
+		message := fmt.Sprintf("Channel mask: %v", channelMaskVec)
+		InfoLog.Info(message, "module", "pmts")
+	}
 	return channelMaskVec, positions
 }
 

@@ -63,23 +63,14 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 	payloadChanB, chanBFound := sipmPayloads[channelB]
 
 	if chanAFound && chanBFound {
-		//fmt.Println("A pair of SIPM FECs has been read, decoding... ", channelA, channelB)
+		if VerbosityLevel > 1 {
+			message := fmt.Sprintf("A pair of SIPM FECs has been read, decoding... %d %d (0x%02x 0x%02x)",
+				channelA, channelB, channelA, channelB)
+			InfoLog.Info(message, "module", "sipms")
+		}
 		// Rebuild payload from the two links
 		payload := buildSipmData(payloadChanA, payloadChanB)
 		position := 0
-		// Print the first 100 bytes in hex from payload separated by spaces
-		//fmt.Println("sipm data: ")
-		//for i := 0; i < 50; i++ {
-		//	fmt.Printf("%04x ", payload[i])
-		//}
-		//fmt.Println()
-
-		// Print the lastest 100 bytes in hex from payload separated by spaces
-		//fmt.Println("sipm data end: ")
-		//for i := len(payload) - 50; i < len(payload); i++ {
-		//	fmt.Printf("%04x ", payload[i])
-		//}
-		//fmt.Println()
 
 		// Read data
 		time := -1
@@ -104,15 +95,20 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 				febInfo := payload[position] & 0x03FF
 				emptyFeb := (febInfo & 0x0002) >> 1
 
+				if VerbosityLevel > 3 {
+					message := fmt.Sprintf("FEB ID: %d (0x%02x). nFEBs: %d", febID, febID, numberOfFEB)
+					InfoLog.Info(message, "module", "sipms")
+				}
+
 				// If there is no data, stop processing this FEB
 				if emptyFeb != 0 {
 					position++
+					if VerbosityLevel > 1 {
+						InfoLog.Info("Empty FEB", "module", "sipms")
+					}
 					continue
 				}
-
 				position++
-				//fmt.Printf("FEB ID: %x\n", febID)
-				//fmt.Printf("j=%d, numberOfFEBs %d, previousFT %x, nextFT %x\n", j, numberOfFEB, previousFT, nextFT)
 
 				FT := uint32(payload[position]) & 0x0FFFF
 				if !ZeroSuppression {
@@ -146,7 +142,6 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 
 				var timeinmus uint32
 				timeinmus, position = computeSipmTime(payload, position, evtFormat)
-				//fmt.Printf("Time in mus: %d\n", timeinmus)
 
 				// If RAW mode, channel mask will appear the first time
 				// If ZS mode, channel mask will appear each time
@@ -154,9 +149,6 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 					var chMask, chPositions []uint16
 					chMask, chPositions, position = sipmChannelMask(payload, position, febID)
 					chMasks[febID] = chPositions
-					//fmt.Printf("time : %d %t\n", time, ZeroSuppression)
-					//fmt.Printf("Channel mask: %v\n", chMask)
-					//fmt.Println("Channel positions: ", chPositions)
 					initializeWaveforms(event.SipmWaveforms, chMask, bufferSamples)
 					computeSipmWaveformPointerArray(wfPointers, event.SipmWaveforms, chMask, chPositions)
 				}
@@ -235,7 +227,11 @@ func computeSipmTime(data []uint16, position int, evtFormat *EventFormat) (uint3
 		}
 	}
 
-	//fmt.Printf("FT is 0x%04x\n", FT)
+	if VerbosityLevel > 3 {
+		message := fmt.Sprintf("FT: 0x%04x", FT)
+		InfoLog.Info(message, "module", "sipms")
+	}
+
 	return uint32(FT), position
 }
 
@@ -281,6 +277,11 @@ func computeSipmPosition(elecID uint16) uint16 {
 	return position
 }
 
+func computeSipmIDFromPosition(position uint16) uint16 {
+	sipmid := (position/64+1)*1000 + position%64
+	return sipmid
+}
+
 func computeSipmWaveformPointerArray(wfPointers []*[]int16, waveforms map[uint16][]int16, chmask []uint16, positions []uint16) {
 	for i, elecID := range chmask {
 		position := positions[i]
@@ -309,10 +310,14 @@ func decodeChargeIndiaSipmCompressed(data []uint16, position int,
 		var control_code int32 = 123456
 		wfvalue := int16(decode_compressed_value(int32(previous), dataword, control_code, current_bit, huffman))
 		last_values[channelID] = wfvalue
-		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x\n", channelID, time, wfvalue)
+
+		if VerbosityLevel > 3 {
+			message := fmt.Sprintf("ElecID %d (%d), time %d, charge 0x%04x",
+				computeSipmIDFromPosition(channelID), channelID, time, wfvalue)
+			InfoLog.Info(message, "module", "sipms")
+		}
 
 		//Save data in Digits
-		//waveforms[channelID][time] = wfvalue
 		waveform := *waveforms[channelID]
 		waveform[time] = wfvalue
 	}
@@ -370,7 +375,11 @@ func decodeCharge(data []uint16, position int, waveforms map[uint16][]int16, cha
 			positionCharge += 2
 		}
 
-		//fmt.Printf("ElecID is %d\t Time is %d\t Charge is 0x%04x", channelMask[channelID], time, charge)
+		if VerbosityLevel > 3 {
+			message := fmt.Sprintf("ElecID %d (%d), time %d, charge 0x%04x",
+				computeSipmIDFromPosition(channelID), channelID, time, charge)
+			InfoLog.Info(message, "module", "sipms")
+		}
 
 		waveforms[channelID][time] = int16(charge)
 

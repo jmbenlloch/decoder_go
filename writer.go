@@ -38,7 +38,7 @@ func NewWriter(filename string) *Writer {
 	// Set string size for HDF5
 	hdf5.SetStringLength(STRLEN)
 
-	//hdf5.RegisterBlosc()
+	hdf5.RegisterBlosc()
 
 	writer := &Writer{}
 	writer.File = openFile(filename)
@@ -322,7 +322,7 @@ func (w *Writer) writeTriggerConfiguration(params TriggerData) {
 
 func processDecodedEvent(event EventType, configuration Configuration,
 	writer *Writer, writer2 *Writer) {
-	if configuration.WriteData {
+	if configuration.WriteData && !event.Error {
 		if configuration.SplitTrg {
 			switch int(event.TriggerType) {
 			case configuration.TrgCode1:

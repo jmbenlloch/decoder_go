@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -63,4 +65,26 @@ func LoadConfiguration(filename string) (Configuration, error) {
 		return config, err
 	}
 	return config, nil
+}
+
+func printConfiguration(config Configuration, logger *slog.Logger) {
+	logger.Info(fmt.Sprintf("File in: %s", config.FileIn), "module", "config")
+	logger.Info(fmt.Sprintf("File out: %s", config.FileOut), "module", "config")
+	logger.Info(fmt.Sprintf("File out2: %s", config.FileOut2), "module", "config")
+	logger.Info(fmt.Sprintf("No DB: %t", config.NoDB), "module", "config")
+	logger.Info(fmt.Sprintf("Host: %s", config.Host), "module", "config")
+	logger.Info(fmt.Sprintf("DB name: %s", config.DBName), "module", "config")
+	logger.Info(fmt.Sprintf("Read PMTs: %t", config.ReadPMTs), "module", "config")
+	logger.Info(fmt.Sprintf("Read SiPMs: %t", config.ReadSiPMs), "module", "config")
+	logger.Info(fmt.Sprintf("Read trigger: %t", config.ReadTrigger), "module", "config")
+	logger.Info(fmt.Sprintf("Skip: %d", config.Skip), "module", "config")
+	logger.Info(fmt.Sprintf("Max events: %d", config.MaxEvents), "module", "config")
+	logger.Info(fmt.Sprintf("Verbosity: %d", config.Verbosity), "module", "config")
+	logger.Info(fmt.Sprintf("Split trigger: %t", config.SplitTrg), "module", "config")
+	logger.Info(fmt.Sprintf("Trigger code 1: %d", config.TrgCode1), "module", "config")
+	logger.Info(fmt.Sprintf("Trigger code 2: %d", config.TrgCode2), "module", "config")
+	logger.Info(fmt.Sprintf("Discard: %t", config.Discard), "module", "config")
+	logger.Info(fmt.Sprintf("Write data: %t", config.WriteData), "module", "config")
+	logger.Info(fmt.Sprintf("Number of workers: %d", config.NumWorkers), "module", "config")
+	logger.Info(fmt.Sprintf("Parallel: %t", config.Parallel), "module", "config")
 }
