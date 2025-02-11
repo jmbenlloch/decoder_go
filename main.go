@@ -119,7 +119,7 @@ func main() {
 		}
 	}
 	duration := time.Since(start)
-	fmt.Println("Total time : ", duration.Milliseconds())
+	fmt.Printf("Total time: %d ms\n", duration.Milliseconds())
 }
 
 func processEvent(eventData []byte, header EventHeaderStruct, writer *Writer, writer2 *Writer) {

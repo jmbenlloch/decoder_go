@@ -1,0 +1,15 @@
+BootStrap: library
+From: jmbenlloch/next/decoder_go_baseimage:latest
+
+%environment
+	export PATH=/usr/local/go/bin:$PATH
+
+%post
+	git clone https://github.com/jmbenlloch/decoder_go decoder
+	cd decoder
+	export PATH=/usr/local/go/bin:$PATH
+	go mod tidy
+	go build
+
+%runscript
+    exec /decoder/decoder_go "$@"

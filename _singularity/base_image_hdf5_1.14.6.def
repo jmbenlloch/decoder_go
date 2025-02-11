@@ -1,0 +1,21 @@
+BootStrap: docker
+From: ubuntu:noble
+
+%post
+	apt-get update -y && \
+	apt-get install -y git make g++ gdb wget && \
+	apt-get autoremove -y && \
+	apt-get clean -y && \
+	rm -rf /var/cache/apt/archives/* && \
+	rm -rf /var/lib/apt/lists/*
+
+	# Install hdf5
+    wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5_1.14.6.tar.gz
+	tar xvf /hdf5_1.14.6.tar.gz
+	cd hdf5-hdf5_1.14.6 && ./configure --prefix=/usr && make -j 4 && make install && cd ..
+	rm -r /hdf5-hdf5_1.14.6 /hdf5_1.14.6.tar.gz
+
+	# Install Go
+	wget https://go.dev/dl/go1.23.6.linux-amd64.tar.gz
+	tar -C /usr/local -xzf /go1.23.6.linux-amd64.tar.gz
+	rm go1.23.6.linux-amd64.tar.gz
