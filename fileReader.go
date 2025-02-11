@@ -55,7 +55,10 @@ func countEvents(file *os.File) int {
 		headerBinary := make([]byte, headerSize)
 		nRead, err := file.Read(headerBinary)
 		if err != nil {
-			fmt.Println("Error reading header:", err)
+			if err != io.EOF {
+				errMessage := fmt.Errorf("error reading header counting events: %w", err)
+				ErrorLog.Error(errMessage.Error())
+			}
 			break
 		}
 		if nRead == 0 {

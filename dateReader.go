@@ -18,7 +18,6 @@ func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	headerBinary := make([]byte, headerSize)
 	nRead, err := file.Read(headerBinary)
 	if err != nil {
-		fmt.Println("Error reading header:", err)
 		return header, nil, err
 	}
 
@@ -35,7 +34,7 @@ func readEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	return header, eventData, nil
 }
 
-func readGDC(eventData []byte, header EventHeaderStruct) EventType {
+func readGDC(eventData []byte, header EventHeaderStruct) (EventType, error) {
 	// Map to keep SiPM data until is read. FEC-ID -> SiPM data
 	var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 
@@ -51,7 +50,12 @@ func readGDC(eventData []byte, header EventHeaderStruct) EventType {
 
 	// If we want to use the DB and the sensors map is not loaded, load it
 	if !configuration.NoDB && sensorsMap == nil {
-		event.SensorsMap = getSensorsFromDB(dbConn, int(header.EventRunNb))
+		var err error
+		event.SensorsMap, err = getSensorsFromDB(dbConn, int(header.EventRunNb))
+		if err != nil {
+			errMessage := fmt.Errorf("error getting sensors map from database: %w", err)
+			return event, errMessage
+		}
 		sensorsMap = &event.SensorsMap
 	} else {
 		event.SensorsMap = *sensorsMap
@@ -69,7 +73,7 @@ func readGDC(eventData []byte, header EventHeaderStruct) EventType {
 	}
 
 	processPmtIds(&event, configuration)
-	return event
+	return event, nil
 }
 
 func readLDC(eventData []byte, position int, event *EventType, sipmPayloads map[uint16][]uint16) int {
@@ -102,6 +106,7 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 	eqHeaderBinary := eventData[position : position+int(eqHeaderSize)]
 	eqHeaderReader := bytes.NewReader(eqHeaderBinary)
 	binary.Read(eqHeaderReader, binary.LittleEndian, &eqHeader)
+	nRead := int(eqHeader.EquipmentSize)
 
 	start := position + int(eqHeaderSize)
 	end := position + int(eqHeader.EquipmentSize)
@@ -113,6 +118,17 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 	event.Timestamp = evtFormat.Timestamp
 	// Set trigger type. All subevents should have the same trigger type
 	event.TriggerType = evtFormat.TriggerType
+
+	// Check error bit
+	if evtFormat.ErrorBit {
+		evtNumber := event.EventID
+		errMessage := fmt.Sprintf("event %d ErrorBit is %t, fec: 0x%x", evtNumber, evtFormat.ErrorBit, evtFormat.FecID)
+		ErrorLog.Error(errMessage)
+		event.Error = true
+		if DiscardErrors {
+			return nRead
+		}
+	}
 
 	switch evtFormat.FWVersion {
 	case 10:
@@ -142,9 +158,12 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 				ReadTriggerFEC(payload[evtFormat.HeaderSize:], event)
 			}
 		}
+	default:
+		errMessage := fmt.Errorf("Unknown firwmare version: %d. Event ID %d, FEC 0x%02x",
+			evtFormat.FWVersion, EventIdGetNbInRun(header.EventId), evtFormat.FecID)
+		ErrorLog.Error(errMessage.Error())
 	}
 
-	nRead := int(eqHeader.EquipmentSize)
 	return nRead
 }
 

@@ -25,22 +25,11 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 			var err error
 			huffmanCodesPmts, err = getHuffmanCodesFromDB(dbConn, int(dateHeader.EventRunNb), PMT)
 			if err != nil {
-				fmt.Println("Error getting huffman codes from database:", err)
+				errMessage := fmt.Errorf("error getting huffman codes from database: %w", err)
+				ErrorLog.Error(errMessage.Error())
 				return
 			}
 		}
-	}
-
-	// TODO: Deal with error bit
-	if evtFormat.ErrorBit {
-		evtNumber := dateHeader.EventId
-		fmt.Printf("Event %d ErrorBit is %t, fec: 0x%x", evtNumber, evtFormat.ErrorBit, fFecId)
-		panic("Error bit is set")
-		//fileError_ = true;
-		//eventError_ = true;
-		//if(discard_){
-		//	return;
-		//}
 	}
 
 	// Reading the payload
@@ -80,7 +69,9 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 			if !Compression {
 				computeNextFThm(&nextFT, &nextFThm, evtFormat)
 				if FT != (nextFThm & 0x0FFFF) {
-					fmt.Printf("nextFThm != FT: 0x%04x, 0x%04x\n", (nextFThm & 0x0ffff), FT)
+					errMessage := fmt.Errorf("nextFThm != FT: 0x%04x, 0x%04x", (nextFThm & 0x0ffff), FT)
+					ErrorLog.Error(errMessage.Error(), "module", "pmts",
+						"eventID", EventIdGetNbInRun(dateHeader.EventId), "fecID", fFecId)
 					break
 				}
 			}

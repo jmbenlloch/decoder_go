@@ -62,7 +62,8 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 	}
 	rows, err := db.Queryx(query)
 	if err != nil {
-		fmt.Println("Error querying database: ", err)
+		errMessage := fmt.Errorf("error querying database: %w", err)
+		return nil, errMessage
 	}
 
 	huffman := &HuffmanNode{
@@ -73,7 +74,8 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 		result := HuffmanCode{}
 		err := rows.StructScan(&result)
 		if err != nil {
-			fmt.Println("Error scanning DB row:", err)
+			errMessage := fmt.Errorf("error scanning DB row: %w", err)
+			return nil, errMessage
 		}
 		parse_huffman_line(int32(result.Value), result.Code, huffman)
 	}
@@ -81,7 +83,7 @@ func getHuffmanCodesFromDB(db *sqlx.DB, runNumber int, sensor SensorType) (*Huff
 	return huffman, nil
 }
 
-func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
+func getSensorsFromDB(db *sqlx.DB, runNumber int) (SensorsMap, error) {
 	query := "SELECT ElecID, SensorID FROM ChannelMapping WHERE MinRun <= %d and MaxRun >= %d ORDER BY SensorID"
 	query = fmt.Sprintf(query, runNumber, runNumber)
 
@@ -95,7 +97,8 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
 
 	rows, err := db.Queryx(query)
 	if err != nil {
-		fmt.Println("Error querying database: ", err)
+		errMessage := fmt.Errorf("error querying database: %w", err)
+		return SensorsMap{}, errMessage
 	}
 
 	npmts := 0
@@ -116,7 +119,8 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
 		result := SensorMappingEntry{}
 		err := rows.StructScan(&result)
 		if err != nil {
-			fmt.Println("Error scanning DB row:", err)
+			errMessage := fmt.Errorf("error scanning DB row: %w", err)
+			return SensorsMap{}, errMessage
 		}
 		if result.ElecID < threshold {
 			npmts += 1
@@ -128,5 +132,5 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) SensorsMap {
 			sensorsMap.Sipms.ToSensorID[uint16(result.ElecID)] = uint16(result.SensorID)
 		}
 	}
-	return sensorsMap
+	return sensorsMap, nil
 }

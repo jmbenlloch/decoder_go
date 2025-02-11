@@ -23,6 +23,7 @@ var (
 	InfoLog        *slog.Logger
 	ErrorLog       *slog.Logger
 	VerbosityLevel int
+	DiscardErrors  bool
 )
 
 func init() {
@@ -42,10 +43,12 @@ func main() {
 	var err error
 	configuration, err = LoadConfiguration(*configFilename)
 	if err != nil {
-		fmt.Println("Error reading configuration file: ", err)
+		message := fmt.Errorf("Error reading configuration file: %w", err)
+		ErrorLog.Error(message.Error())
 		return
 	}
 	VerbosityLevel = configuration.Verbosity
+	DiscardErrors = configuration.Discard
 	if VerbosityLevel > 0 {
 		message := fmt.Sprintf("Reading configuration file: %s", *configFilename)
 		InfoLog.Info(message, "module", "main")
@@ -56,13 +59,15 @@ func main() {
 
 	dbConn, err = ConnectToDatabase(configuration.User, configuration.Passwd, configuration.Host, configuration.DBName)
 	if err != nil {
-		fmt.Println("Error connecting to database:", err)
+		message := fmt.Errorf("Error connection to database: %w", err)
+		ErrorLog.Error(message.Error())
 		return
 	}
 
 	file, err := os.Open(configuration.FileIn)
 	if err != nil {
-		fmt.Println("Error opening file:", err)
+		message := fmt.Errorf("Error opening file: %w", err)
+		ErrorLog.Error(message.Error())
 		return
 	}
 	defer file.Close()
@@ -104,13 +109,23 @@ func main() {
 		for {
 			header, eventData, err := fileReader.getNextEvent()
 			if err != nil {
-				fmt.Println("Error reading event:", err)
+				if err != io.EOF {
+					message := fmt.Errorf("error reading event: %w", err)
+					ErrorLog.Error(message.Error())
+				}
 				break
 			}
-			if err == io.EOF {
-				break
+			event, err := readGDC(eventData, header)
+			if err != nil {
+				message := fmt.Errorf("error reading GDC data: %w", err)
+				ErrorLog.Error(message.Error())
+				continue
 			}
-			event := readGDC(eventData, header)
+			if event.Error && DiscardErrors {
+				message := fmt.Sprintf("discarding event %d", event.EventID)
+				ErrorLog.Error(message)
+				continue
+			}
 			processDecodedEvent(event, configuration, writer, writer2)
 		}
 	}

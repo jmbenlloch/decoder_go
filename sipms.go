@@ -26,7 +26,8 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 		var err error
 		huffmanCodesSipms, err = getHuffmanCodesFromDB(dbConn, int(dateHeader.EventRunNb), SiPM)
 		if err != nil {
-			fmt.Println("Error getting huffman codes from database:", err)
+			errMessage := fmt.Errorf("error getting huffman codes from database: %w", err)
+			ErrorLog.Error(errMessage.Error())
 			return
 		}
 	}
@@ -127,14 +128,14 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 							nextFT = previousFT
 						}
 						if nextFT != FT {
-							evtNumber := dateHeader.EventId
-							fmt.Printf("SiPM Error! Event %d, FECs (0x%x, 0x%x), FEB ID (0x%x, %d), expected FT was 0x%x, current FT is 0x%x, time %d", evtNumber, channelA, channelB, febID, febID, nextFT, FT, time)
-							panic("SiPM Error!")
-							//fileError_ = true
-							//eventError_ = true
-							//if discard_ {
-							//	return
-							//}
+							evtNumber := EventIdGetNbInRun(dateHeader.EventId)
+							errMessage := fmt.Sprintf("Event %d, FECs (0x%x, 0x%x), FEB ID (0x%x, %d), expected FT was 0x%x, current FT is 0x%x, time %d",
+								evtNumber, channelA, channelB, febID, febID, nextFT, FT, time)
+							ErrorLog.Error(errMessage, "module", "sipms")
+							event.Error = true
+							if DiscardErrors {
+								return
+							}
 						}
 						previousFT = nextFT
 					}
@@ -185,7 +186,8 @@ func buildSipmData(dataA []uint16, dataB []uint16) []uint16 {
 	data := make([]uint16, size)
 
 	if len(dataA) != len(dataB) {
-		panic("Data from both SiPM links must have the same length")
+		errMessage := fmt.Sprintf("data from both SiPM links must have the same length: %d != %d", len(dataA), len(dataB))
+		panic(errMessage)
 	}
 
 	for i := 0; i < len(dataA); i++ {
