@@ -115,22 +115,36 @@ func main() {
 				}
 				break
 			}
-			event, err := readGDC(eventData, header)
-			if err != nil {
-				message := fmt.Errorf("error reading GDC data: %w", err)
-				ErrorLog.Error(message.Error())
-				continue
-			}
-			if event.Error && DiscardErrors {
-				message := fmt.Sprintf("discarding event %d", event.EventID)
-				ErrorLog.Error(message)
-				continue
-			}
-			processDecodedEvent(event, configuration, writer, writer2)
+			processEvent(eventData, header, writer, writer2)
 		}
 	}
 	duration := time.Since(start)
 	fmt.Println("Total time : ", duration.Milliseconds())
+}
+
+func processEvent(eventData []byte, header EventHeaderStruct, writer *Writer, writer2 *Writer) {
+	defer func() {
+		if r := recover(); r != nil {
+			eventID := EventIdGetNbInRun(header.EventId)
+			errMessage := fmt.Errorf("decoder recovered from panic on event %d: %v", eventID, r)
+			ErrorLog.Error(errMessage.Error())
+			message := fmt.Sprintf("discarding event %d", eventID)
+			ErrorLog.Error(message)
+		}
+	}()
+
+	event, err := readGDC(eventData, header)
+	if err != nil {
+		message := fmt.Errorf("error reading GDC data: %w", err)
+		ErrorLog.Error(message.Error())
+		return
+	}
+	if event.Error && DiscardErrors {
+		message := fmt.Sprintf("discarding event %d", event.EventID)
+		ErrorLog.Error(message)
+		return
+	}
+	processDecodedEvent(event, configuration, writer, writer2)
 }
 
 func numberOfEventsToProcess(fileEvtCount int, skipEvts int, maxEvtCount int) int {
