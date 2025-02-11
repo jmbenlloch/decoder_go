@@ -38,14 +38,15 @@ func NewWriter(filename string) *Writer {
 	// Set string size for HDF5
 	hdf5.SetStringLength(STRLEN)
 
-	hdf5.RegisterBlosc()
+	// So far we are not using Blosc
+	//hdf5.RegisterBlosc()
 
 	writer := &Writer{}
 	writer.File = openFile(filename)
-	writer.RunGroup, _ = createGroup(writer.File, "Run")
-	writer.RDGroup, _ = createGroup(writer.File, "RD")
-	writer.SensorsGroup, _ = createGroup(writer.File, "Sensors")
-	writer.TriggerGroup, _ = createGroup(writer.File, "Trigger")
+	writer.RunGroup = createGroup(writer.File, "Run")
+	writer.RDGroup = createGroup(writer.File, "RD")
+	writer.SensorsGroup = createGroup(writer.File, "Sensors")
+	writer.TriggerGroup = createGroup(writer.File, "Trigger")
 	writer.EventTable = createTable(writer.RunGroup, "events", EventDataHDF5{})
 	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", RunInfoHDF5{})
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
@@ -113,7 +114,7 @@ func (w *Writer) WriteEvent(event *EventType) {
 	})
 
 	writeEntryToTable(w.TriggerTypeTable, TriggerTypeHDF5{
-		trigger_type: event.TriggerType,
+		trigger_type: int32(event.TriggerType),
 	})
 
 	var pmtSorted, sipmSorted []SensorMappingHDF5

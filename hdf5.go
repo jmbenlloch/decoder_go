@@ -17,7 +17,7 @@ type TriggerLostHDF5 struct {
 }
 
 type TriggerTypeHDF5 struct {
-	trigger_type uint16
+	trigger_type int32
 }
 
 type RunInfoHDF5 struct {
@@ -43,20 +43,19 @@ func convertToHdf5String(s string) [STRLEN]byte {
 }
 
 func openFile(fname string) *hdf5.File {
-	// create the file
 	f, err := hdf5.CreateFile(fname, hdf5.F_ACC_TRUNC)
 	if err != nil {
 		panic(err)
 	}
-	//defer f.Close()
-	//fmt.Printf(":: file [%s] created (id=%d)\n", fname, f.ID())
 	return f
 }
 
-func createGroup(file *hdf5.File, groupName string) (*hdf5.Group, error) {
-	// create the group
+func createGroup(file *hdf5.File, groupName string) *hdf5.Group {
 	g, err := file.CreateGroup(groupName)
-	return g, err
+	if err != nil {
+		panic(err)
+	}
+	return g
 }
 
 func create3dArray(group *hdf5.Group, name string, nSensors int, nSamples int) *hdf5.Dataset {
@@ -75,13 +74,14 @@ func create2dArray(group *hdf5.Group, name string, nSensors int) *hdf5.Dataset {
 	unlimitedDims := -1 // H5S_UNLIMITED is -1L
 	maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors)}
 	chunks := []uint{1, 32768}
+	if nSensors < 32768 {
+		chunks[1] = uint(nSensors)
+	}
 	dataset := createArray(group, name, dimsArray, maxDimsArray, chunks)
 	return dataset
 }
 
 func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, chunks []uint) *hdf5.Dataset {
-	//unlimitedDims := -1 // H5S_UNLIMITED is -1L
-	//maxDimsArray := []uint{uint(unlimitedDims), uint(nSensors), uint(nSamples)}
 	file_spaceArray, err := hdf5.CreateSimpleDataspace(dims, maxDims)
 	if err != nil {
 		panic(err)
@@ -95,29 +95,16 @@ func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, ch
 	}
 
 	plistArray.SetChunk(chunks)
-	// Set compression level
-	//plistArray.SetDeflate(4)
-	hdf5.ConfigureBloscFilter(plistArray, 9)
 
-	// create the memory data type
-	//dtypeArray, err := hdf5.NewDatatypeFromValue(int16(7))
-	//fmt.Println(dtypeArray)
-	//if err != nil {
-	//	fmt.Println("datatype")
-	//	panic("could not create a dtype")
-	//}
+	// Set compression level
+	plistArray.SetDeflate(4)
+	//hdf5.ConfigureBloscFilter(plistArray, 9)
 
 	// create the dataset
 	dsetArray, err := group.CreateDatasetWith(name, hdf5.T_NATIVE_INT16, file_spaceArray, plistArray)
 	if err != nil {
-		fmt.Println("dataset")
-		fmt.Println(err)
 		panic(err)
 	}
-
-	//dimsGot, maxdimsGot, err := dsetArray.Space().SimpleExtentDims()
-	//	fmt.Println("1-Size array: ", dimsGot, maxdimsGot)
-
 	return dsetArray
 }
 
@@ -127,38 +114,33 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 	maxDims := []uint{uint(unlimitedDims)}
 	file_space, err := hdf5.CreateSimpleDataspace(dims, maxDims)
 	if err != nil {
-		fmt.Println("space")
 		panic(err)
 	}
-	//fmt.Println(file_space)
 
 	// create property list
 	plist, err := hdf5.NewPropList(hdf5.P_DATASET_CREATE)
 	if err != nil {
-		fmt.Println("plist")
 		panic(err)
 	}
+
 	chunks := []uint{32768}
 	plist.SetChunk(chunks)
+
 	// Set compression level
-	//plist.SetDeflate(4)
-	hdf5.ConfigureBloscFilter(plist, 9)
+	plist.SetDeflate(4)
+	//hdf5.ConfigureBloscFilter(plist, 9)
 
 	// create the memory data type
 	dtype, err := hdf5.NewDatatypeFromValue(datatype)
 	if err != nil {
-		fmt.Println("datatype")
-		panic("could not create a dtype")
+		panic(err)
 	}
 
 	// create the dataset
 	dset, err := group.CreateDatasetWith(name, dtype, file_space, plist)
 	if err != nil {
-		fmt.Println("dataset")
-		fmt.Println(err)
 		panic(err)
 	}
-	//fmt.Printf(":: dset (id=%d)\n", dset.ID())
 	return dset
 }
 
@@ -177,28 +159,20 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
 	}
 
 	// extend
-	//dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
 	dimsGot, _, err := dataset.Space().SimpleExtentDims()
 	eventsInFile := dimsGot[0]
-	//fmt.Println("Size: ", dimsGot, maxdimsGot)
 	newsize := []uint{eventsInFile + length}
 	dataset.Resize(newsize)
 	filespace := dataset.Space()
-	//fmt.Println(filespace)
 
 	start := []uint{eventsInFile}
 	count := []uint{length}
 	filespace.SelectHyperslab(start, nil, count, nil)
 
-	// write data to the dataset
-	//fmt.Printf(":: dset.Write...\n")
-	//err = dset.Write(&s2)
 	err = dataset.WriteSubset(data, dataspace, filespace)
 	if err != nil {
-		fmt.Println("final write")
 		panic(err)
 	}
-	//fmt.Printf(":: dset.Write... [ok]\n")
 
 	dataspace.Close()
 	filespace.Close()
@@ -210,14 +184,11 @@ func write3dArray(dataset *hdf5.Dataset, data *[]int16) {
 	eventsInFile := dimsGot[0]
 	nSensors := maxdimsGot[1]
 	nSamples := maxdimsGot[2]
-	//fmt.Println("2-Size array: ", dimsGot, maxdimsGot)
 	newsize := []uint{eventsInFile + 1, nSensors, nSamples}
 	dataset.Resize(newsize)
 	filespace := dataset.Space()
-	//fmt.Println(filespace)
 
 	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
-	//fmt.Println("3-Size array: ", dimsGot, maxdimsGot)
 
 	start := []uint{eventsInFile, 0, 0}
 	count := []uint{1, nSensors, nSamples}
@@ -225,19 +196,14 @@ func write3dArray(dataset *hdf5.Dataset, data *[]int16) {
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
 	if err != nil {
-		fmt.Println("space")
 		panic(err)
 	}
 
 	// write data to the dataset
-	//fmt.Printf(":: dset.Write...\n")
-	//err = dsetArray.Write(&charges)
-	//err = dataset.WriteSubset(data, dataspace, filespace)
 	err = dataset.WriteSubset(data, dataspace, filespace)
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Printf(":: dset.Write... [ok]\n")
 
 	dataspace.Close()
 	filespace.Close()
@@ -248,14 +214,11 @@ func write2dArray(dataset *hdf5.Dataset, data *[]int16) {
 	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
 	eventsInFile := dimsGot[0]
 	nSensors := maxdimsGot[1]
-	//fmt.Println("2-Size array: ", dimsGot, maxdimsGot)
 	newsize := []uint{eventsInFile + 1, nSensors}
 	dataset.Resize(newsize)
 	filespace := dataset.Space()
-	//fmt.Println(filespace)
 
 	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
-	//fmt.Println("3-Size array: ", dimsGot, maxdimsGot)
 
 	start := []uint{eventsInFile, 0}
 	count := []uint{1, nSensors}
@@ -263,19 +226,13 @@ func write2dArray(dataset *hdf5.Dataset, data *[]int16) {
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
 	if err != nil {
-		fmt.Println("space")
 		panic(err)
 	}
 
-	// write data to the dataset
-	//fmt.Printf(":: dset.Write...\n")
-	//err = dsetArray.Write(&charges)
-	//err = dataset.WriteSubset(data, dataspace, filespace)
 	err = dataset.WriteSubset(data, dataspace, filespace)
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Printf(":: dset.Write... [ok]\n")
 
 	dataspace.Close()
 	filespace.Close()
