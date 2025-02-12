@@ -53,8 +53,8 @@ func NewWriter(filename string) *Writer {
 	writer.TriggerLostTable = createTable(writer.TriggerGroup, "triggerLost", TriggerLostHDF5{})
 	writer.TriggerTypeTable = createTable(writer.TriggerGroup, "trigger", TriggerTypeHDF5{})
 	writer.TriggerChannels = create2dArray(writer.TriggerGroup, "events", N_TRG_CH)
-	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPmt", SensorMappingHDF5{})
-	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSipm", SensorMappingHDF5{})
+	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPMT", SensorMappingHDF5{})
+	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSiPM", SensorMappingHDF5{})
 	return writer
 }
 
