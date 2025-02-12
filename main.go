@@ -63,6 +63,7 @@ func main() {
 		ErrorLog.Error(message.Error())
 		return
 	}
+	defer dbConn.Close()
 
 	file, err := os.Open(configuration.FileIn)
 	if err != nil {
