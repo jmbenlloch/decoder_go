@@ -245,7 +245,7 @@ func writePmtPedestals(evtFormat *EventFormat, channelMask []uint16, baselines m
 		// 11 -> 25,27,29, ..., 47
 		//       25,27,29,...      -> 0,1,2,3,4,5
 		//       37,39,41,...      -> 0,1,2,3,4,5
-		baseline_index := (elecID % 12) / 2
+		baseline_index := ((elecID % 100) % 12) / 2
 		baselines[elecID] = evtFormat.Baselines[baseline_index]
 	}
 }
