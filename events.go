@@ -16,6 +16,7 @@ type EventType struct {
 	// the value has to be retrieved from the NEXT headers from PMT or SiPM
 	TriggerType    uint16
 	ExtTrgWaveform *[]int16
+	PmtSumWaveform *[]int16
 	Error          bool
 }
 

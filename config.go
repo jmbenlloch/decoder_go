@@ -11,6 +11,7 @@ type Configuration struct {
 	MaxEvents   int    `json:"max_events"`
 	Verbosity   int    `json:"verbosity"`
 	ExtTrigger  int    `json:"ext_trigger"`
+	PmtSumCh    int    `json:"pmt_sum_ch"`
 	FileIn      string `json:"file_in"`
 	FileOut     string `json:"file_out"`
 	FileOut2    string `json:"file_out2"`

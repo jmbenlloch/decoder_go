@@ -49,16 +49,18 @@ func readGDC(eventData []byte, header EventHeaderStruct) (EventType, error) {
 	event.EventID = EventIdGetNbInRun(header.EventId)
 
 	// If we want to use the DB and the sensors map is not loaded, load it
-	if !configuration.NoDB && sensorsMap == nil {
-		var err error
-		event.SensorsMap, err = getSensorsFromDB(dbConn, int(header.EventRunNb))
-		if err != nil {
-			errMessage := fmt.Errorf("error getting sensors map from database: %w", err)
-			return event, errMessage
+	if !configuration.NoDB {
+		if sensorsMap == nil {
+			var err error
+			event.SensorsMap, err = getSensorsFromDB(dbConn, int(header.EventRunNb))
+			if err != nil {
+				errMessage := fmt.Errorf("error getting sensors map from database: %w", err)
+				return event, errMessage
+			}
+			sensorsMap = &event.SensorsMap
+		} else {
+			event.SensorsMap = *sensorsMap
 		}
-		sensorsMap = &event.SensorsMap
-	} else {
-		event.SensorsMap = *sensorsMap
 	}
 
 	// Read LDCs

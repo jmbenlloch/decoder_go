@@ -260,6 +260,13 @@ func processPmtIds(event *EventType, configuration Configuration) {
 			delete(event.Baselines, elecID)
 		}
 
+		// Check PMT sum waveform
+		if elecID == uint16(configuration.PmtSumCh) {
+			event.PmtSumWaveform = &waveform
+			delete(event.PmtWaveforms, elecID)
+			delete(event.Baselines, elecID)
+		}
+
 		// Check dual channels
 		// dual channels are used to send the original waveform and the BLR one
 		// They appear as two different channels, but the signal comes from the same
