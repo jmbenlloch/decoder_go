@@ -1,19 +1,24 @@
 {
     "file_in": "run_14711.ldc1next.next-100.045.rd",
     "file_out": "test.h5",
-    "file_out2": "",
+    "file_out2": "test2.h5",
     "two_files": false,
     "no_db": false,
-    "verbosity": 9,
+    "verbosity": 1,
+	"discard": true,
     "host": "next.ific.uv.es",
     "user": "nextreader",
     "pass": "readonly",
 	"read_pmts": true,
 	"read_sipms": true,
 	"read_trigger": true,
+	"trg_code1": 1,
+	"trg_code2": 2,
 	"skip": 3,
-	"max_events": 5,
+	"max_events": 4,
     "dbname": "NEXT100DB",
     "split_trg": false,
-    "max_evts": 1
+	"num_workers": 1,
+	"write_data": true,
+	"parallel": false
 }
