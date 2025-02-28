@@ -1,4 +1,4 @@
-module github.com/jmbenlloch/decoder_go
+module github.com/next-exp/decoder_go
 
 go 1.22.0
 
