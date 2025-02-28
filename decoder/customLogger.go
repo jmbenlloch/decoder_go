@@ -16,11 +16,11 @@ type Logger struct {
 	ErrorLog *slog.Logger
 }
 
-func (l *Logger) Info(message string, module string) {
+func (l Logger) Info(message string, module string) {
 	l.InfoLog.Info(message, "module", module)
 }
 
-func (l *Logger) Error(message string) {
+func (l Logger) Error(message string) {
 	l.ErrorLog.Error(message)
 }
 

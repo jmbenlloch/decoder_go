@@ -70,7 +70,6 @@ func countEvents(file *os.File) (int, int) {
 			}
 			break
 		}
-		runNumber = int(header.EventRunNb)
 
 		headerReader := bytes.NewReader(headerBinary)
 		binary.Read(headerReader, binary.LittleEndian, &header)
@@ -78,6 +77,7 @@ func countEvents(file *os.File) (int, int) {
 			message := fmt.Sprintf("Evt id: %d. GDC %d", decoder.EventIdGetNbInRun(header.EventId), header.EventGdcId)
 			logger.Info(message, "evtCounter")
 		}
+		runNumber = int(header.EventRunNb)
 		payloadSize := uint32(header.EventSize) - uint32(headerSize)
 		file.Seek(int64(payloadSize), 1)
 

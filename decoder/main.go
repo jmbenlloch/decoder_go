@@ -45,6 +45,7 @@ func main() {
 		return
 	}
 	decoder.SetConfiguration(configuration)
+	decoder.SetLogger(logger)
 
 	VerbosityLevel = configuration.Verbosity
 	DiscardErrors = configuration.Discard
