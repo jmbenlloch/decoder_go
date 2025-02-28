@@ -12,7 +12,7 @@ func ValidEvent(header EventHeaderStruct) bool {
 	return header.EventType == PHYSICS_EVENT || header.EventType == CALIBRATION_EVENT
 }
 
-func ReadEvent(file *os.File) (EventHeaderStruct, []byte, error) {
+func ReadEventFromFile(file *os.File) (EventHeaderStruct, []byte, error) {
 	var header EventHeaderStruct
 	headerSize := unsafe.Sizeof(header)
 	headerBinary := make([]byte, headerSize)
@@ -31,6 +31,21 @@ func ReadEvent(file *os.File) (EventHeaderStruct, []byte, error) {
 	payloadSize := uint32(header.EventSize) - uint32(headerSize)
 	eventData := make([]byte, payloadSize)
 	file.Read(eventData)
+	return header, eventData, nil
+
+}
+
+func ReadEvent(data []byte) (EventHeaderStruct, []byte, error) {
+	var header EventHeaderStruct
+	headerSize := unsafe.Sizeof(header)
+	if len(data) < int(headerSize) {
+		return header, nil, fmt.Errorf("data is too short")
+	}
+	headerReader := bytes.NewReader(data[:headerSize])
+	binary.Read(headerReader, binary.LittleEndian, &header)
+
+	payloadSize := uint32(header.EventSize) - uint32(headerSize)
+	eventData := data[headerSize : uint32(headerSize)+payloadSize]
 	return header, eventData, nil
 }
 

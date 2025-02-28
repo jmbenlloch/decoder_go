@@ -21,7 +21,7 @@ func NewFileReader(file *os.File) *FileReader {
 }
 
 func (f *FileReader) getNextEvent() (decoder.EventHeaderStruct, []byte, error) {
-	header, eventData, err := decoder.ReadEvent(f.File)
+	header, eventData, err := decoder.ReadEventFromFile(f.File)
 	if err != nil {
 		return header, nil, err
 	}
