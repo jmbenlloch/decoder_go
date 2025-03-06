@@ -31,6 +31,8 @@ func LoadConfiguration(filename string) (decoder.Configuration, error) {
 	config.NumWorkers = 1
 	config.WriteData = true
 	config.Parallel = false
+	config.UseBlosc = false
+	config.CompressionLevel = 4
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
