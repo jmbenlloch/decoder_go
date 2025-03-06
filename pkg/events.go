@@ -9,8 +9,6 @@ type EventType struct {
 	BlrBaselines  map[uint16]uint16
 	EventID       uint32
 	Timestamp     uint64
-	SensorsMap    SensorsMap
-	SipmMapping   SensorMapping
 	TriggerConfig TriggerData
 	// Trigger type is not written correctly in the trigger FEC
 	// the value has to be retrieved from the NEXT headers from PMT or SiPM

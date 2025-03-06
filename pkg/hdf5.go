@@ -3,7 +3,7 @@ package decoder
 import (
 	"fmt"
 
-	"github.com/jmbenlloch/go-hdf5"
+	"github.com/next-exp/hdf5-go"
 )
 
 type EventDataHDF5 struct {
@@ -97,8 +97,11 @@ func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, ch
 	plistArray.SetChunk(chunks)
 
 	// Set compression level
-	plistArray.SetDeflate(4)
-	//hdf5.ConfigureBloscFilter(plistArray, 9)
+	if configuration.UseBlosc {
+		hdf5.ConfigureBloscFilter(plistArray, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, hdf5.BLOSC_SHUFFLE)
+	} else {
+		plistArray.SetDeflate(configuration.CompressionLevel)
+	}
 
 	// create the dataset
 	dsetArray, err := group.CreateDatasetWith(name, hdf5.T_NATIVE_INT16, file_spaceArray, plistArray)
@@ -127,8 +130,11 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 	plist.SetChunk(chunks)
 
 	// Set compression level
-	plist.SetDeflate(4)
-	//hdf5.ConfigureBloscFilter(plist, 9)
+	if configuration.UseBlosc {
+		hdf5.ConfigureBloscFilter(plist, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, hdf5.BLOSC_SHUFFLE)
+	} else {
+		plist.SetDeflate(configuration.CompressionLevel)
+	}
 
 	// create the memory data type
 	dtype, err := hdf5.NewDatatypeFromValue(datatype)

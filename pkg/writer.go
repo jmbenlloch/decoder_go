@@ -5,12 +5,13 @@ import (
 	"reflect"
 	"sort"
 
-	hdf5 "github.com/jmbenlloch/go-hdf5"
+	hdf5 "github.com/next-exp/hdf5-go"
 	"golang.org/x/exp/maps"
 )
 
 type Writer struct {
 	File               *hdf5.File
+	Filename           string
 	FirstEvt           bool
 	RunGroup           *hdf5.Group
 	RDGroup            *hdf5.Group
@@ -40,10 +41,17 @@ func NewWriter(filename string) *Writer {
 	hdf5.SetStringLength(STRLEN)
 
 	// So far we are not using Blosc
-	//hdf5.RegisterBlosc()
+	if configuration.UseBlosc {
+		blosc_version, blosc_date, err := hdf5.RegisterBlosc()
+		fmt.Println("Blosc version: ", blosc_version, " date: ", blosc_date)
+		if err != nil {
+			logger.Error(err.Error())
+		}
+	}
 
 	writer := &Writer{}
 	writer.File = openFile(filename)
+	writer.Filename = filename
 	writer.RunGroup = createGroup(writer.File, "Run")
 	writer.RDGroup = createGroup(writer.File, "RD")
 	writer.SensorsGroup = createGroup(writer.File, "Sensors")
@@ -128,8 +136,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 		nPmts = len(event.PmtWaveforms)
 		nSipms = len(event.SipmWaveforms)
 	} else {
-		pmtSorted = sortSensorsBySensorID(event.SensorsMap.Pmts.ToSensorID)
-		sipmSorted = sortSensorsBySensorID(event.SensorsMap.Sipms.ToSensorID)
+		pmtSorted = sortSensorsBySensorID(sensorsMap.Pmts.ToSensorID)
+		sipmSorted = sortSensorsBySensorID(sensorsMap.Sipms.ToSensorID)
 		nPmts = len(pmtSorted)
 		nSipms = len(sipmSorted)
 	}
