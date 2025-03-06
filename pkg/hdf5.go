@@ -98,7 +98,7 @@ func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, ch
 
 	// Set compression level
 	if configuration.UseBlosc {
-		hdf5.ConfigureBloscFilter(plistArray, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, hdf5.BLOSC_SHUFFLE)
+		hdf5.ConfigureBloscFilter(plistArray, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, configuration.BloscShuffle.Code)
 	} else {
 		plistArray.SetDeflate(configuration.CompressionLevel)
 	}
@@ -131,7 +131,7 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 
 	// Set compression level
 	if configuration.UseBlosc {
-		hdf5.ConfigureBloscFilter(plist, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, hdf5.BLOSC_SHUFFLE)
+		hdf5.ConfigureBloscFilter(plist, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, configuration.BloscShuffle.Code)
 	} else {
 		plist.SetDeflate(configuration.CompressionLevel)
 	}
