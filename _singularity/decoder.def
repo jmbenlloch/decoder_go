@@ -3,13 +3,20 @@ From: jmbenlloch/next/decoder_go_baseimage:latest
 
 %environment
 	export PATH=/usr/local/go/bin:$PATH
+	export PATH=/root/go/bin:$PATH
+	export LD_LIBRARY_PATH=/usr/local/hdf5-blosc/lib:$LD_LIBRARY_PATH
+	export LD_LIBRARY_PATH=/root/hdf5-blosc/build/blosc/lib:$LD_LIBRARY_PATH
 
 %post
 	git clone https://github.com/jmbenlloch/decoder_go decoder
 	cd decoder
 	export PATH=/usr/local/go/bin:$PATH
+	export PATH=/root/go/bin:$PATH
+	go install github.com/magefile/mage@latest
 	go mod tidy
-	go build
+    export CGO_LDFLAGS="-L/usr/local/hdf5-blosc/lib -L/root/hdf5-blosc/build/blosc/lib"
+	export CGO_CFLAGS="-I/usr/local/hdf5-blosc/include -I/root/hdf5-blosc/build/blosc/include"
+    mage
 
 %runscript
-    exec /decoder/decoder_go "$@"
+    exec /decoder/bin/decoder -config "$@"

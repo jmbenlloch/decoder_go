@@ -1,7 +1,18 @@
-sudo singularity build base_image_hdf5_1.14.6.sif  base_image_hdf5_1.14.6.def
-sudo singularity build --sandbox debug  base_image_hdf5_1.14.6.def
+sudo singularity build base_image_hdf5_repo.sif  base_image_hdf5_repo.def
+sudo singularity build --sandbox debug  base_image_hdf5_repo.def
 sudo singularity shell --writable debug
-singularity sign base_image_hdf5_1.14.6.sif
-singularity push base_image_hdf5_1.14.6.sif library://jmbenlloch/next/decoder_go_baseimage:latest
+singularity sign base_image_hdf5_repo.sif
+singularity push base_image_hdf5_repo.sif library://jmbenlloch/next/decoder_go_baseimage:latest
 
 sudo singularity build decoder.sif  decoder.def 
+
+
+###
+sudo singularity build base_image_hdf5_go.sif decoder_baseimage_hdf5_1.14.def
+singularity sign base_image_hdf5_go.sif
+singularity push base_image_hdf5_go.sif library://jmbenlloch/next/decoder_go_baseimage:latest
+
+
+###
+sudo singularity build decoder_go.sif  decoder.def
+singularity sign decoder_go.sif
