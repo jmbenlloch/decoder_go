@@ -152,7 +152,7 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 						position = decodeChargeIndiaSipmCompressed(payload, position, wfPointers,
 							&current_bit, huffmanCodesSipms, chMasks[febID], lastValues, timeinmus)
 					} else {
-						position = decodeCharge(data, position, event.SipmWaveforms, chMasks[febID], timeinmus)
+						position = decodeCharge(payload, position, wfPointers, chMasks[febID], timeinmus)
 					}
 				} else {
 					if CompressedData {
@@ -160,7 +160,7 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 						position = decodeChargeIndiaSipmCompressed(payload, position, wfPointers,
 							&current_bit, huffmanCodesSipms, chMasks[febID], lastValues, uint32(time))
 					} else {
-						position = decodeCharge(data, position, event.SipmWaveforms, chMasks[febID], uint32(time))
+						position = decodeCharge(payload, position, wfPointers, chMasks[febID], uint32(time))
 					}
 				}
 			}
@@ -332,20 +332,20 @@ func initializeWaveforms(waveforms map[uint16][]int16, channelMask []uint16, buf
 	}
 }
 
-func decodeCharge(data []uint16, position int, waveforms map[uint16][]int16, channelMask []uint16, time uint32) int {
+func decodeCharge(data []uint16, position int, waveforms []*[]int16, channelMask []uint16, time uint32) int {
 	//Raw Mode
 	var charge int32 = 0
 	positionCharge := position
 
 	//We have 64 SiPM per FEB
-	for _, channelID := range channelMask {
+	for snsIndex, channelID := range channelMask {
 		// Pack two 16-bit words into a 32-bit word in the correct order
 		dataU8 := make([]byte, 4)
-		binary.BigEndian.PutUint16(dataU8[0:2], data[position])
-		binary.BigEndian.PutUint16(dataU8[2:4], data[position+1])
+		binary.BigEndian.PutUint16(dataU8[0:2], data[positionCharge])
+		binary.BigEndian.PutUint16(dataU8[2:4], data[positionCharge+1])
 		charge = int32(binary.BigEndian.Uint32(dataU8))
 
-		switch channelID % 4 {
+		switch snsIndex % 4 {
 		case 0:
 			charge = charge >> 20
 			charge = charge & 0x0fff
@@ -362,10 +362,10 @@ func decodeCharge(data []uint16, position int, waveforms map[uint16][]int16, cha
 			charge = charge & 0x0fff
 			break
 		}
-		if (channelID % 4) == 1 {
+		if (snsIndex % 4) == 1 {
 			positionCharge++
 		}
-		if (channelID % 4) == 3 {
+		if (snsIndex % 4) == 3 {
 			positionCharge += 2
 		}
 
@@ -375,12 +375,13 @@ func decodeCharge(data []uint16, position int, waveforms map[uint16][]int16, cha
 			logger.Info(message, "sipms")
 		}
 
-		waveforms[channelID][time] = int16(charge)
+		waveform := *waveforms[channelID]
+		waveform[time] = int16(charge)
 
 		// Channel 3 does not add new words
 		// 3 words (0123,4567,89AB) give 4 charges (012,345,678,9AB)
 		// (012)(3 45)(67 8)(9AB)
-		if (channelID % 4) != 3 {
+		if (snsIndex % 4) != 3 {
 			position++
 		}
 	}

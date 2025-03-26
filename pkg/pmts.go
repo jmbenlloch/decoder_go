@@ -63,7 +63,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 					break
 				}
 			}
-			position = decodeCharge(data, position, event.PmtWaveforms, chPositions, uint32(time))
+			position = decodeCharge(data, position, wfPointers, chPositions, uint32(time))
 		}
 	}
 }
