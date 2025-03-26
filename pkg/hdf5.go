@@ -180,9 +180,13 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T, evtCounter int) 
 	}
 
 	err = dataspace.Close()
-	fmt.Println(err)
+	if err != nil {
+		fmt.Println(err)
+	}
 	err = filespace.Close()
-	fmt.Println(err)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func write3dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors int, nSamples int) {
