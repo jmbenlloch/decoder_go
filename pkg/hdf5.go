@@ -150,12 +150,12 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 	return dset
 }
 
-func writeEntryToTable[T any](dataset *hdf5.Dataset, data T) {
+func writeEntryToTable[T any](dataset *hdf5.Dataset, data T, evtCounter int) {
 	array := []T{data}
-	writeArrayToTable(dataset, &array)
+	writeArrayToTable(dataset, &array, evtCounter)
 }
 
-func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
+func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T, evtCounter int) {
 	length := uint(len(*data))
 	dims := []uint{length}
 	dataspace, err := hdf5.CreateSimpleDataspace(dims, nil)
@@ -165,8 +165,7 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
 	}
 
 	// extend
-	dimsGot, _, err := dataset.Space().SimpleExtentDims()
-	eventsInFile := dimsGot[0]
+	eventsInFile := uint(evtCounter)
 	newsize := []uint{eventsInFile + length}
 	dataset.Resize(newsize)
 	filespace := dataset.Space()
@@ -180,24 +179,20 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T) {
 		panic(err)
 	}
 
-	dataspace.Close()
-	filespace.Close()
+	err = dataspace.Close()
+	fmt.Println(err)
+	err = filespace.Close()
+	fmt.Println(err)
 }
 
-func write3dArray(dataset *hdf5.Dataset, data *[]int16) {
+func write3dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors int, nSamples int) {
 	// extend
-	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
-	eventsInFile := dimsGot[0]
-	nSensors := maxdimsGot[1]
-	nSamples := maxdimsGot[2]
-	newsize := []uint{eventsInFile + 1, nSensors, nSamples}
+	newsize := []uint{uint(evtCounter) + 1, uint(nSensors), uint(nSamples)}
 	dataset.Resize(newsize)
 	filespace := dataset.Space()
 
-	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
-
-	start := []uint{eventsInFile, 0, 0}
-	count := []uint{1, nSensors, nSamples}
+	start := []uint{uint(evtCounter), 0, 0}
+	count := []uint{1, uint(nSensors), uint(nSamples)}
 	filespace.SelectHyperslab(start, nil, count, nil)
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
@@ -211,23 +206,20 @@ func write3dArray(dataset *hdf5.Dataset, data *[]int16) {
 		panic(err)
 	}
 
-	dataspace.Close()
-	filespace.Close()
+	err = dataspace.Close()
+	//fmt.Println("dataspace closed ", err)
+	err = filespace.Close()
+	//fmt.Println("filespace closed ", err)
 }
 
-func write2dArray(dataset *hdf5.Dataset, data *[]int16) {
+func write2dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors int) {
 	// extend
-	dimsGot, maxdimsGot, err := dataset.Space().SimpleExtentDims()
-	eventsInFile := dimsGot[0]
-	nSensors := maxdimsGot[1]
-	newsize := []uint{eventsInFile + 1, nSensors}
+	newsize := []uint{uint(evtCounter) + 1, uint(nSensors)}
 	dataset.Resize(newsize)
 	filespace := dataset.Space()
 
-	dimsGot, maxdimsGot, err = dataset.Space().SimpleExtentDims()
-
-	start := []uint{eventsInFile, 0}
-	count := []uint{1, nSensors}
+	start := []uint{uint(evtCounter), 0}
+	count := []uint{1, uint(nSensors)}
 	filespace.SelectHyperslab(start, nil, count, nil)
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)

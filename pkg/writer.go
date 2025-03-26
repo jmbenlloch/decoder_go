@@ -1,6 +1,7 @@
 package decoder
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -32,6 +33,7 @@ type Writer struct {
 	SipmWaveforms      *hdf5.Dataset
 	Baselines          *hdf5.Dataset
 	BlrBaselines       *hdf5.Dataset
+	EvtCounter         int
 }
 
 const N_TRG_CH = 64
@@ -50,6 +52,7 @@ func NewWriter(filename string) *Writer {
 	}
 
 	writer := &Writer{}
+	fmt.Println("hdf5writer: Creating file: ", filename)
 	writer.File = openFile(filename)
 	writer.Filename = filename
 	writer.RunGroup = createGroup(writer.File, "Run")
@@ -64,6 +67,7 @@ func NewWriter(filename string) *Writer {
 	writer.TriggerChannels = create2dArray(writer.TriggerGroup, "events", N_TRG_CH)
 	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPMT", SensorMappingHDF5{})
 	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSiPM", SensorMappingHDF5{})
+	writer.EvtCounter = 0
 	return writer
 }
 
@@ -112,7 +116,7 @@ func sortSensorsByElecID(sensors map[uint16][]int16) []SensorMappingHDF5 {
 
 func (w *Writer) WriteEvent(event *EventType) {
 	// Write event data
-	datatest := EventDataHDF5{
+	evtTimestamp := EventDataHDF5{
 		timestamp:  event.Timestamp,
 		evt_number: int32(event.EventID),
 	}
@@ -120,11 +124,11 @@ func (w *Writer) WriteEvent(event *EventType) {
 	writeEntryToTable(w.TriggerLostTable, TriggerLostHDF5{
 		triggerLost1: int32(event.TriggerConfig.TriggerLost1),
 		triggerLost2: int32(event.TriggerConfig.TriggerLost2),
-	})
+	}, w.EvtCounter)
 
 	writeEntryToTable(w.TriggerTypeTable, TriggerTypeHDF5{
 		trigger_type: int32(event.TriggerType),
-	})
+	}, w.EvtCounter)
 
 	var pmtSorted, sipmSorted []SensorMappingHDF5
 	var nPmts, nBlrs, nSipms int
@@ -162,9 +166,9 @@ func (w *Writer) WriteEvent(event *EventType) {
 	}
 
 	if !w.FirstEvt {
-		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)})
-		writeArrayToTable(w.PmtMappingTable, &pmtSorted)
-		writeArrayToTable(w.SipmMappingTable, &sipmSorted)
+		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)}, w.EvtCounter)
+		writeArrayToTable(w.PmtMappingTable, &pmtSorted, w.EvtCounter)
+		writeArrayToTable(w.SipmMappingTable, &sipmSorted, w.EvtCounter)
 
 		w.writeTriggerConfiguration(event.TriggerConfig)
 
@@ -194,29 +198,29 @@ func (w *Writer) WriteEvent(event *EventType) {
 		w.FirstEvt = true
 	}
 
-	writeEntryToTable(w.EventTable, datatest)
+	writeEntryToTable(w.EventTable, evtTimestamp, w.EvtCounter)
 
 	// Write waveforms
 	if nPmts > 0 {
-		writeWaveforms(w.PmtWaveforms, event.PmtWaveforms, pmtSorted, nPmts, pmtSamples)
-		writeBaselines(w.Baselines, event.Baselines, pmtSorted, nPmts)
+		writeWaveforms(w.PmtWaveforms, event.PmtWaveforms, pmtSorted, w.EvtCounter, nPmts, pmtSamples)
+		writeBaselines(w.Baselines, event.Baselines, pmtSorted, w.EvtCounter, nPmts)
 	}
 	if nBlrs > 0 {
 		// This uses the same channel order as the PMTs
 		// it works well when reading the channel map from DB
 		// in no-DB mode, if there is a dual channel of a missing normal channel,
 		// it will not be written.
-		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, pmtSorted, nPmts, pmtSamples)
-		writeBaselines(w.BlrBaselines, event.BlrBaselines, pmtSorted, nPmts)
+		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, pmtSorted, w.EvtCounter, nPmts, pmtSamples)
+		writeBaselines(w.BlrBaselines, event.BlrBaselines, pmtSorted, w.EvtCounter, nPmts)
 	}
 	if nSipms > 0 {
-		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, nSipms, sipmSamples)
+		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, w.EvtCounter, nSipms, sipmSamples)
 	}
 	if event.ExtTrgWaveform != nil {
-		writeSingleWaveform(w.ExtTrgWaveform, event.ExtTrgWaveform)
+		writeSingleWaveform(w.ExtTrgWaveform, event.ExtTrgWaveform, w.EvtCounter)
 	}
 	if event.PmtSumWaveform != nil {
-		writeSingleWaveform(w.PmtSumWaveform, event.PmtSumWaveform)
+		writeSingleWaveform(w.PmtSumWaveform, event.PmtSumWaveform, w.EvtCounter)
 	}
 
 	trgChannels := make([]int16, N_TRG_CH)
@@ -227,12 +231,13 @@ func (w *Writer) WriteEvent(event *EventType) {
 			fmt.Println("Trigger channel out of range: ", sensor)
 		}
 	}
-	write2dArray(w.TriggerChannels, &trgChannels)
+	write2dArray(w.TriggerChannels, &trgChannels, w.EvtCounter, N_TRG_CH)
 
+	w.EvtCounter++
 }
 
 func writeWaveforms(dset *hdf5.Dataset, waveforms map[uint16][]int16,
-	order []SensorMappingHDF5, nSensors int, nSamples int) {
+	order []SensorMappingHDF5, evtCounter int, nSensors int, nSamples int) {
 	data := make([]int16, nSensors*nSamples)
 	for i, sensor := range order {
 		// Write only if the corresponding sensor has data
@@ -244,19 +249,20 @@ func writeWaveforms(dset *hdf5.Dataset, waveforms map[uint16][]int16,
 			data[i*nSamples+j] = int16(sample)
 		}
 	}
-	write3dArray(dset, &data)
+	write3dArray(dset, &data, evtCounter, nSensors, nSamples)
 }
 
-func writeSingleWaveform(dset *hdf5.Dataset, waveform *[]int16) {
-	data := make([]int16, len(*waveform))
+func writeSingleWaveform(dset *hdf5.Dataset, waveform *[]int16, evtCounter int) {
+	nSamples := len(*waveform)
+	data := make([]int16, nSamples)
 	for i, value := range *waveform {
 		data[i] = value
 	}
-	write2dArray(dset, &data)
+	write2dArray(dset, &data, evtCounter, nSamples)
 }
 
 func writeBaselines(dset *hdf5.Dataset, baselines map[uint16]uint16,
-	order []SensorMappingHDF5, nSensors int) {
+	order []SensorMappingHDF5, evtCounter int, nSensors int) {
 	data := make([]int16, nSensors)
 	for i, sensor := range order {
 		// Write only if the corresponding sensor has data
@@ -266,7 +272,7 @@ func writeBaselines(dset *hdf5.Dataset, baselines map[uint16]uint16,
 		}
 		data[i] = int16(baselines[uint16(sensor.channel)])
 	}
-	write2dArray(dset, &data)
+	write2dArray(dset, &data, evtCounter, nSensors)
 }
 
 func (w *Writer) Close() {
@@ -338,7 +344,7 @@ func (w *Writer) writeTriggerConfiguration(params TriggerData) {
 		}
 	}
 	toWrite := entries[:fieldsToWrite]
-	writeArrayToTable(w.TriggerParamsTable, &toWrite)
+	writeArrayToTable(w.TriggerParamsTable, &toWrite, w.EvtCounter)
 }
 
 func ProcessDecodedEvent(event EventType, configuration Configuration,
