@@ -251,6 +251,7 @@ func processPmtIds(event *EventType, configuration Configuration) {
 		// Check PMT sum waveform
 		if elecID == uint16(configuration.PmtSumCh) {
 			event.PmtSumWaveform = &waveform
+			event.PmtSumBaseline = event.Baselines[elecID]
 			delete(event.PmtWaveforms, elecID)
 			delete(event.Baselines, elecID)
 		}

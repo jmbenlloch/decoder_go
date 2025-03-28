@@ -30,6 +30,7 @@ type Writer struct {
 	BlrWaveforms       *hdf5.Dataset
 	ExtTrgWaveform     *hdf5.Dataset
 	PmtSumWaveform     *hdf5.Dataset
+	PmtSumBaseline     *hdf5.Dataset
 	SipmWaveforms      *hdf5.Dataset
 	Baselines          *hdf5.Dataset
 	BlrBaselines       *hdf5.Dataset
@@ -188,6 +189,7 @@ func (w *Writer) WriteEvent(event *EventType) {
 		if event.PmtSumWaveform != nil {
 			samples := len(*event.PmtSumWaveform)
 			w.PmtSumWaveform = create2dArray(w.RDGroup, "pmt_sum", samples)
+			w.PmtSumBaseline = create2dArray(w.RDGroup, "pmt_sum_baseline", 1)
 		}
 
 		if len(event.BlrWaveforms) > 0 {
@@ -221,6 +223,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 	}
 	if event.PmtSumWaveform != nil {
 		writeSingleWaveform(w.PmtSumWaveform, event.PmtSumWaveform, w.EvtCounter)
+		pmtSumBaseline := []int16{int16(event.PmtSumBaseline)}
+		writeSingleWaveform(w.PmtSumBaseline, &pmtSumBaseline, w.EvtCounter)
 	}
 
 	trgChannels := make([]int16, N_TRG_CH)
@@ -308,6 +312,11 @@ func (w *Writer) Close() error {
 	if w.PmtSumWaveform != nil {
 		if err := w.PmtSumWaveform.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("error closing PMT sum waveform: %w", err))
+		}
+	}
+	if w.PmtSumBaseline != nil {
+		if err := w.PmtSumBaseline.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing PMT sum baselines: %w", err))
 		}
 	}
 	if w.BlrWaveforms != nil {

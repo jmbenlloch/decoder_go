@@ -15,6 +15,7 @@ type EventType struct {
 	TriggerType    uint16
 	ExtTrgWaveform *[]int16
 	PmtSumWaveform *[]int16
+	PmtSumBaseline uint16
 	Error          bool
 }
 
