@@ -6,6 +6,8 @@ From: jmbenlloch/next/decoder_go_baseimage:latest
 	export PATH=/root/go/bin:$PATH
 	export LD_LIBRARY_PATH=/usr/local/hdf5-blosc/lib:$LD_LIBRARY_PATH
 	export LD_LIBRARY_PATH=/root/hdf5-blosc/build/blosc/lib:$LD_LIBRARY_PATH
+	export CGO_LDFLAGS="-L/usr/local/hdf5-blosc/lib -L/root/hdf5-blosc/build/blosc/lib"
+	export CGO_CFLAGS="-I/usr/local/hdf5-blosc/include -I/root/hdf5-blosc/build/blosc/include"
 
 %post
 	git clone https://github.com/jmbenlloch/decoder_go decoder
