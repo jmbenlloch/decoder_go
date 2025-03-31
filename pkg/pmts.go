@@ -39,13 +39,16 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 	//stop condition...
 	for true {
 		time++
+
+		// Stop reading if we reach the last time bin of the waveform
+		if time == int(bufferSamples) {
+			break
+		}
+
 		if Compression {
 			// Skip FTm
 			if time == 0 {
 				position++
-			}
-			if time == int(bufferSamples) {
-				break
 			}
 			position = decodeChargeIndiaPmtCompressed(data, position, wfPointers,
 				&current_bit, huffmanCodesPmts, chPositions, uint32(time))
@@ -54,14 +57,13 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 			position++
 
 			//If not ZS check next FT value, if not expected (0xffff) end of data
-			if !Compression {
-				computeNextFThm(&nextFT, &nextFThm, evtFormat)
-				if FT != (nextFThm & 0x0FFFF) {
-					errMessage := fmt.Errorf("evt %d, fecID: %d, nextFThm != FT: 0x%04x, 0x%04x",
-						EventIdGetNbInRun(dateHeader.EventId), fFecId, (nextFThm & 0x0ffff), FT)
-					logger.Error(errMessage.Error())
-					break
-				}
+			computeNextFThm(&nextFT, &nextFThm, evtFormat)
+			if FT != (nextFThm & 0x0FFFF) {
+				// Check with run 13868 DEMO.
+				errMessage := fmt.Errorf("evt %d, fecID: %d, nextFThm != FT: 0x%04x, 0x%04x",
+					EventIdGetNbInRun(dateHeader.EventId), fFecId, (nextFThm & 0x0ffff), FT)
+				logger.Error(errMessage.Error())
+				break
 			}
 			position = decodeCharge(data, position, wfPointers, chPositions, uint32(time))
 		}
