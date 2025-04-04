@@ -73,56 +73,70 @@ func main() {
 	}
 	defer file.Close()
 
-	// Create writers
-	var writer, writer2 *decoder.Writer
-	writer = decoder.NewWriter(configuration.FileOut)
-	if configuration.SplitTrg {
-		writer2 = decoder.NewWriter(configuration.FileOut2)
-		defer writer2.Close()
-	}
-	defer writer.Close()
-
-	evtCount, runNumber := countEvents(file)
-	evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
-	if VerbosityLevel > 0 {
-		message := fmt.Sprintf("Number of events: %d", evtCount)
-		logger.Info(message, "main")
-	}
-
-	decoder.LoadDatabase(dbConn, runNumber)
-
-	fileReader := NewFileReader(file)
-
-	start := time.Now()
-	if configuration.Parallel {
-		jobs := make(chan WorkerData, configuration.NumWorkers)
-		results := make(chan decoder.EventType, configuration.NumWorkers)
-
-		for w := 1; w <= configuration.NumWorkers; w++ {
-			go worker(w, jobs, results)
+	// Write files in infinite loop
+	nLoop := 0
+	for {
+		fmt.Println("Loop number: ", nLoop)
+		// Create writers
+		var writer, writer2 *decoder.Writer
+		writer = decoder.NewWriter(configuration.FileOut)
+		if configuration.SplitTrg {
+			writer2 = decoder.NewWriter(configuration.FileOut2)
+			//	defer writer2.Close()
 		}
-		go sendEventsToWorkers(fileReader, jobs)
+		//	defer writer.Close()
 
-		if evtsToRead > 0 {
-			// TODO: This should be modified to write in parallel trigger1 and trigger2
-			processWorkerResults(results, writer, writer2, evtsToRead)
+		evtCount, runNumber := countEvents(file)
+		evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
+		if VerbosityLevel > 0 {
+			message := fmt.Sprintf("Number of events: %d", evtCount)
+			logger.Info(message, "main")
 		}
-		close(results)
-	} else {
-		for {
-			header, eventData, err := fileReader.getNextEvent()
-			if err != nil {
-				if err != io.EOF {
-					message := fmt.Errorf("error reading event: %w", err)
-					logger.Error(message.Error())
-				}
-				break
+
+		decoder.LoadDatabase(dbConn, runNumber)
+
+		fileReader := NewFileReader(file)
+
+		start := time.Now()
+
+		if configuration.Parallel {
+			jobs := make(chan WorkerData, configuration.NumWorkers)
+			results := make(chan decoder.EventType, configuration.NumWorkers)
+
+			for w := 1; w <= configuration.NumWorkers; w++ {
+				go worker(w, jobs, results)
 			}
-			processEvent(eventData, header, writer, writer2)
+			go sendEventsToWorkers(fileReader, jobs)
+
+			if evtsToRead > 0 {
+				// TODO: This should be modified to write in parallel trigger1 and trigger2
+				processWorkerResults(results, writer, writer2, evtsToRead)
+			}
+			close(results)
+		} else {
+			for {
+				header, eventData, err := fileReader.getNextEvent()
+				if err != nil {
+					if err != io.EOF {
+						message := fmt.Errorf("error reading event: %w", err)
+						logger.Error(message.Error())
+					}
+					break
+				}
+				processEvent(eventData, header, writer, writer2)
+			}
 		}
+		duration := time.Since(start)
+		fmt.Printf("Total time: %d ms\n", duration.Milliseconds())
+
+		writer.Close()
+		if configuration.SplitTrg {
+			writer2.Close()
+		}
+		// Reset file
+		file.Seek(0, 0)
+		nLoop++
 	}
-	duration := time.Since(start)
-	fmt.Printf("Total time: %d ms\n", duration.Milliseconds())
 }
 
 func processEvent(eventData []byte, header decoder.EventHeaderStruct, writer *decoder.Writer, writer2 *decoder.Writer) {
