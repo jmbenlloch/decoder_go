@@ -92,9 +92,13 @@ func ReadTriggerFEC(data []uint16, event *EventType) {
 	for chinfo := 0; chinfo < 3; chinfo++ {
 		for j := 15; j >= 0; j-- {
 			activePMT := CheckBit(data[position]&0x0FFFF, uint16(j))
-			//fmt.Printf("trigger ch %d: %t\n", channelNumber, activePMT)
 			if activePMT {
-				trgChannels = append(trgChannels, channelNumber)
+				// Bit 0-11 -> 100-111
+				// Bit 12-23 -> 200-207
+				// Bit 24-35 -> 300-307
+				// Bit 36-47 -> 400-407
+				elecid := 100*(channelNumber/12+1) + (channelNumber % 12)
+				trgChannels = append(trgChannels, elecid)
 			}
 			channelNumber--
 		}

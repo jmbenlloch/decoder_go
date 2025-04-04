@@ -140,6 +140,7 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) (SensorsMap, error) {
 			ToElecID:   make(map[uint16]uint16),
 			ToSensorID: make(map[uint16]uint16),
 		},
+		PmtIDOffset: 10000, // default value before finding the real one
 	}
 
 	for rows.Next() {
@@ -153,6 +154,9 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) (SensorsMap, error) {
 			npmts += 1
 			sensorsMap.Pmts.ToElecID[uint16(result.SensorID)] = uint16(result.ElecID)
 			sensorsMap.Pmts.ToSensorID[uint16(result.ElecID)] = uint16(result.SensorID)
+			if result.SensorID < int(sensorsMap.PmtIDOffset) {
+				sensorsMap.PmtIDOffset = uint16(result.SensorID)
+			}
 		} else {
 			nsipms += 1
 			sensorsMap.Sipms.ToElecID[uint16(result.SensorID)] = uint16(result.ElecID)

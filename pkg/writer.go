@@ -37,7 +37,7 @@ type Writer struct {
 	EvtCounter         int
 }
 
-const N_TRG_CH = 64
+const N_TRG_CH = 48
 
 func NewWriter(filename string) *Writer {
 	// Set string size for HDF5
@@ -65,7 +65,6 @@ func NewWriter(filename string) *Writer {
 	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
 	writer.TriggerLostTable = createTable(writer.TriggerGroup, "triggerLost", TriggerLostHDF5{})
 	writer.TriggerTypeTable = createTable(writer.TriggerGroup, "trigger", TriggerTypeHDF5{})
-	writer.TriggerChannels = create2dArray(writer.TriggerGroup, "events", N_TRG_CH)
 	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPMT", SensorMappingHDF5{})
 	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSiPM", SensorMappingHDF5{})
 	writer.EvtCounter = 0
@@ -134,17 +133,20 @@ func (w *Writer) WriteEvent(event *EventType) {
 	var pmtSorted, sipmSorted []SensorMappingHDF5
 	var nPmts, nBlrs, nSipms int
 	var pmtSamples, sipmSamples int
+	var nTrgChs int
 
 	if configuration.NoDB {
 		pmtSorted = sortSensorsByElecID(event.PmtWaveforms)
 		sipmSorted = sortSensorsByElecID(event.SipmWaveforms)
 		nPmts = len(event.PmtWaveforms)
 		nSipms = len(event.SipmWaveforms)
+		nTrgChs = N_TRG_CH
 	} else {
 		pmtSorted = sortSensorsBySensorID(sensorsMap.Pmts.ToSensorID)
 		sipmSorted = sortSensorsBySensorID(sensorsMap.Sipms.ToSensorID)
 		nPmts = len(pmtSorted)
 		nSipms = len(sipmSorted)
+		nTrgChs = nPmts
 	}
 	nBlrs = len(event.BlrWaveforms)
 
@@ -172,6 +174,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 		writeArrayToTable(w.SipmMappingTable, &sipmSorted, w.EvtCounter)
 
 		w.writeTriggerConfiguration(event.TriggerConfig)
+
+		w.TriggerChannels = create2dArray(w.TriggerGroup, "events", nTrgChs)
 
 		if nPmts > 0 {
 			w.PmtWaveforms = create3dArray(w.RDGroup, "pmtrwf", nPmts, pmtSamples)
@@ -227,17 +231,51 @@ func (w *Writer) WriteEvent(event *EventType) {
 		writeSingleWaveform(w.PmtSumBaseline, &pmtSumBaseline, w.EvtCounter)
 	}
 
-	trgChannels := make([]int16, N_TRG_CH)
-	for _, sensor := range event.TriggerConfig.TrgChannels {
-		if sensor < N_TRG_CH {
+	if configuration.NoDB {
+		writeTriggerChannelsNoDB(w.TriggerChannels, event.TriggerConfig.TrgChannels, nTrgChs, w.EvtCounter)
+	} else {
+		writeTriggerChannels(w.TriggerChannels, event.TriggerConfig.TrgChannels, nTrgChs,
+			sensorsMap.Pmts.ToSensorID, sensorsMap.PmtIDOffset, w.EvtCounter)
+	}
+
+	w.EvtCounter++
+}
+
+func writeTriggerChannels(dset *hdf5.Dataset, channels []uint16, nTrgChs int,
+	sensors map[uint16]uint16, pmtIDOffset uint16, evtCounter int) {
+	trgChannels := make([]int16, nTrgChs)
+	for _, elecid := range channels {
+		sensor, exists := sensors[uint16(elecid)]
+		if exists {
+			sensorCorrected := sensor - pmtIDOffset
+			if sensorCorrected < uint16(nTrgChs) {
+				trgChannels[sensorCorrected] = 1
+			} else {
+				fmt.Println("Trigger channel out of range: ", elecid, sensor)
+			}
+		} else {
+			fmt.Println("Trigger channel not found in mapping: ", elecid, sensor)
+		}
+	}
+	write2dArray(dset, &trgChannels, evtCounter, nTrgChs)
+}
+
+func writeTriggerChannelsNoDB(dset *hdf5.Dataset, channels []uint16, nTrgChs int, evtCounter int) {
+	trgChannels := make([]int16, nTrgChs)
+	for _, elecid := range channels {
+		// Map the elecid into 0-47
+		// 100-111 -> 0-11
+		// 200-207 -> 12-23
+		// 300-307 -> 24-35
+		// 400-407 -> 36-47
+		sensor := (elecid/100-1)*12 + (elecid%100)%12
+		if sensor < uint16(nTrgChs) {
 			trgChannels[sensor] = 1
 		} else {
 			fmt.Println("Trigger channel out of range: ", sensor)
 		}
 	}
-	write2dArray(w.TriggerChannels, &trgChannels, w.EvtCounter, N_TRG_CH)
-
-	w.EvtCounter++
+	write2dArray(dset, &trgChannels, evtCounter, nTrgChs)
 }
 
 func writeWaveforms(dset *hdf5.Dataset, waveforms map[uint16][]int16,

@@ -22,6 +22,8 @@ type EventType struct {
 type SensorsMap struct {
 	Pmts  SensorMapping
 	Sipms SensorMapping
+	// In DEMOPP the sensor ID for PMTs are 2,3,4...
+	PmtIDOffset uint16
 }
 
 type SensorMapping struct {
