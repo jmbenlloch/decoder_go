@@ -174,10 +174,10 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T, evtCounter int) 
 	count := []uint{length}
 	filespace.SelectHyperslab(start, nil, count, nil)
 
-	err = dataset.WriteSubset(data, dataspace, filespace)
-	if err != nil {
-		panic(err)
-	}
+	//err = dataset.WriteSubset(data, dataspace, filespace)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	err = dataspace.Close()
 	if err != nil {
@@ -205,10 +205,10 @@ func write3dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors
 	}
 
 	// write data to the dataset
-	err = dataset.WriteSubset(data, dataspace, filespace)
-	if err != nil {
-		panic(err)
-	}
+	//err = dataset.WriteSubset(data, dataspace, filespace)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	err = dataspace.Close()
 	//fmt.Println("dataspace closed ", err)
@@ -231,10 +231,10 @@ func write2dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors
 		panic(err)
 	}
 
-	err = dataset.WriteSubset(data, dataspace, filespace)
-	if err != nil {
-		panic(err)
-	}
+	//err = dataset.WriteSubset(data, dataspace, filespace)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	dataspace.Close()
 	filespace.Close()
