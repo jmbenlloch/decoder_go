@@ -321,11 +321,15 @@ func (w *Writer) Close() error {
 	fmt.Println("Closing file hdf writer ", w.Filename)
 	var errs []error
 
-	if err := w.EventTable.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing event table: %w", err))
+	if w.EventTable != nil {
+		if err := w.EventTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing event table: %w", err))
+		}
 	}
-	if err := w.RunInfoTable.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing run info table: %w", err))
+	if w.RunInfoTable != nil {
+		if err := w.RunInfoTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing run info table: %w", err))
+		}
 	}
 	if w.PmtWaveforms != nil {
 		if err := w.PmtWaveforms.Close(); err != nil {
@@ -367,40 +371,60 @@ func (w *Writer) Close() error {
 			errs = append(errs, fmt.Errorf("error closing BLR baselines: %w", err))
 		}
 	}
-	if err := w.PmtMappingTable.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing PMT mapping table: %w", err))
+	if w.PmtMappingTable != nil {
+		if err := w.PmtMappingTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing PMT mapping table: %w", err))
+		}
 	}
-	if err := w.SipmMappingTable.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing SiPM mapping table: %w", err))
+	if w.SipmMappingTable != nil {
+		if err := w.SipmMappingTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing SiPM mapping table: %w", err))
+		}
 	}
 	if w.TriggerParamsTable != nil {
 		if err := w.TriggerParamsTable.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("error closing trigger params table: %w", err))
 		}
 	}
-	if err := w.TriggerLostTable.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing trigger lost table: %w", err))
+	if w.TriggerLostTable != nil {
+		if err := w.TriggerLostTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing trigger lost table: %w", err))
+		}
 	}
-	if err := w.TriggerTypeTable.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing trigger type table: %w", err))
+	if w.TriggerTypeTable != nil {
+		if err := w.TriggerTypeTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing trigger type table: %w", err))
+		}
 	}
-	if err := w.TriggerChannels.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing trigger channels: %w", err))
+	if w.TriggerChannels != nil {
+		if err := w.TriggerChannels.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing trigger channels: %w", err))
+		}
 	}
-	if err := w.RunGroup.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing run group: %w", err))
+	if w.RunGroup != nil {
+		if err := w.RunGroup.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing run group: %w", err))
+		}
 	}
-	if err := w.RDGroup.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing RD group: %w", err))
+	if w.RDGroup != nil {
+		if err := w.RDGroup.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing RD group: %w", err))
+		}
 	}
-	if err := w.SensorsGroup.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing sensors group: %w", err))
+	if w.SensorsGroup != nil {
+		if err := w.SensorsGroup.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing sensors group: %w", err))
+		}
 	}
-	if err := w.TriggerGroup.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing trigger group: %w", err))
+	if w.TriggerGroup != nil {
+		if err := w.TriggerGroup.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing trigger group: %w", err))
+		}
 	}
-	if err := w.File.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing file: %w", err))
+	if w.File != nil {
+		if err := w.File.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing file: %w", err))
+		}
 	}
 
 	if len(errs) > 0 {
