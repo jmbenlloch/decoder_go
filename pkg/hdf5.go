@@ -1,8 +1,6 @@
 package decoder
 
 import (
-	"fmt"
-
 	"github.com/next-exp/hdf5-go"
 )
 
@@ -45,7 +43,7 @@ func convertToHdf5String(s string) [STRLEN]byte {
 func openFile(fname string) *hdf5.File {
 	f, err := hdf5.CreateFile(fname, hdf5.F_ACC_TRUNC)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 	return f
 }
@@ -53,7 +51,7 @@ func openFile(fname string) *hdf5.File {
 func createGroup(file *hdf5.File, groupName string) *hdf5.Group {
 	g, err := file.CreateGroup(groupName)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 	return g
 }
@@ -84,30 +82,45 @@ func create2dArray(group *hdf5.Group, name string, nSensors int) *hdf5.Dataset {
 func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, chunks []uint) *hdf5.Dataset {
 	file_spaceArray, err := hdf5.CreateSimpleDataspace(dims, maxDims)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	// create property list
 	plistArray, err := hdf5.NewPropList(hdf5.P_DATASET_CREATE)
 	if err != nil {
-		fmt.Println("plist")
-		panic(err)
+		logger.Error(err.Error())
 	}
 
-	plistArray.SetChunk(chunks)
+	err = plistArray.SetChunk(chunks)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 
 	// Set compression level
 	if configuration.UseBlosc {
-		hdf5.ConfigureBloscFilter(plistArray, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, configuration.BloscShuffle.Code)
+		err = hdf5.ConfigureBloscFilter(plistArray, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, configuration.BloscShuffle.Code)
 	} else {
-		plistArray.SetDeflate(configuration.CompressionLevel)
+		err = plistArray.SetDeflate(configuration.CompressionLevel)
+	}
+	if err != nil {
+		logger.Error(err.Error())
 	}
 
 	// create the dataset
 	dsetArray, err := group.CreateDatasetWith(name, hdf5.T_NATIVE_INT16, file_spaceArray, plistArray)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
+
+	err = file_spaceArray.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+	err = plistArray.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+
 	return dsetArray
 }
 
@@ -123,30 +136,55 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 	// create property list
 	plist, err := hdf5.NewPropList(hdf5.P_DATASET_CREATE)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	chunks := []uint{32768}
-	plist.SetChunk(chunks)
+	err = plist.SetChunk(chunks)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 
 	// Set compression level
 	if configuration.UseBlosc {
-		hdf5.ConfigureBloscFilter(plist, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, configuration.BloscShuffle.Code)
+		err = hdf5.ConfigureBloscFilter(plist, configuration.BloscAlgorithm.Code, configuration.CompressionLevel, configuration.BloscShuffle.Code)
 	} else {
-		plist.SetDeflate(configuration.CompressionLevel)
+		err = plist.SetDeflate(configuration.CompressionLevel)
+	}
+	if err != nil {
+		logger.Error(err.Error())
 	}
 
 	// create the memory data type
 	dtype, err := hdf5.NewDatatypeFromValue(datatype)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	// create the dataset
 	dset, err := group.CreateDatasetWith(name, dtype, file_space, plist)
 	if err != nil {
+		logger.Error(err.Error())
+	}
+	if err != nil {
 		panic(err)
 	}
+
+	err = plist.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+
+	err = file_space.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+
+	err = dtype.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+
 	return dset
 }
 
@@ -160,39 +198,47 @@ func writeArrayToTable[T any](dataset *hdf5.Dataset, data *[]T, evtCounter int) 
 	dims := []uint{length}
 	dataspace, err := hdf5.CreateSimpleDataspace(dims, nil)
 	if err != nil {
-		fmt.Println("space")
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	// extend
 	eventsInFile := uint(evtCounter)
 	newsize := []uint{eventsInFile + length}
-	dataset.Resize(newsize)
+	err = dataset.Resize(newsize)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 	filespace := dataset.Space()
 
 	start := []uint{eventsInFile}
 	count := []uint{length}
-	filespace.SelectHyperslab(start, nil, count, nil)
+	err = filespace.SelectHyperslab(start, nil, count, nil)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 
 	err = dataset.WriteSubset(data, dataspace, filespace)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	err = dataspace.Close()
 	if err != nil {
-		fmt.Println(err)
+		logger.Error(err.Error())
 	}
 	err = filespace.Close()
 	if err != nil {
-		fmt.Println(err)
+		logger.Error(err.Error())
 	}
 }
 
 func write3dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors int, nSamples int) {
 	// extend
 	newsize := []uint{uint(evtCounter) + 1, uint(nSensors), uint(nSamples)}
-	dataset.Resize(newsize)
+	err := dataset.Resize(newsize)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 	filespace := dataset.Space()
 
 	start := []uint{uint(evtCounter), 0, 0}
@@ -201,25 +247,32 @@ func write3dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	// write data to the dataset
 	err = dataset.WriteSubset(data, dataspace, filespace)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	err = dataspace.Close()
-	//fmt.Println("dataspace closed ", err)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 	err = filespace.Close()
-	//fmt.Println("filespace closed ", err)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 }
 
 func write2dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors int) {
 	// extend
 	newsize := []uint{uint(evtCounter) + 1, uint(nSensors)}
-	dataset.Resize(newsize)
+	err := dataset.Resize(newsize)
+	if err != nil {
+		logger.Error(err.Error())
+	}
 	filespace := dataset.Space()
 
 	start := []uint{uint(evtCounter), 0}
@@ -228,14 +281,20 @@ func write2dArray(dataset *hdf5.Dataset, data *[]int16, evtCounter int, nSensors
 
 	dataspace, err := hdf5.CreateSimpleDataspace(count, nil)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
 	err = dataset.WriteSubset(data, dataspace, filespace)
 	if err != nil {
-		panic(err)
+		logger.Error(err.Error())
 	}
 
-	dataspace.Close()
-	filespace.Close()
+	err = dataspace.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
+	err = filespace.Close()
+	if err != nil {
+		logger.Error(err.Error())
+	}
 }
