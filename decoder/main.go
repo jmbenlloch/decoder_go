@@ -73,17 +73,8 @@ func main() {
 	}
 	defer file.Close()
 
-	// Create writers
-	var writer, writer2 *decoder.Writer
-	writer = decoder.NewWriter(configuration.FileOut)
-	if configuration.SplitTrg {
-		writer2 = decoder.NewWriter(configuration.FileOut2)
-		defer writer2.Close()
-	}
-	defer writer.Close()
-
 	evtCount, runNumber := countEvents(file)
-	evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
+	//evtsToRead := numberOfEventsToProcess(evtCount, configuration.Skip, configuration.MaxEvents)
 	if VerbosityLevel > 0 {
 		message := fmt.Sprintf("Number of events: %d", evtCount)
 		logger.Info(message, "main")
@@ -93,36 +84,54 @@ func main() {
 
 	fileReader := NewFileReader(file)
 
-	start := time.Now()
-	if configuration.Parallel {
-		jobs := make(chan WorkerData, configuration.NumWorkers)
-		results := make(chan decoder.EventType, configuration.NumWorkers)
+	decodedEvents := make([]decoder.EventType, 0)
 
-		for w := 1; w <= configuration.NumWorkers; w++ {
-			go worker(w, jobs, results)
-		}
-		go sendEventsToWorkers(fileReader, jobs)
-
-		if evtsToRead > 0 {
-			// TODO: This should be modified to write in parallel trigger1 and trigger2
-			processWorkerResults(results, writer, writer2, evtsToRead)
-		}
-		close(results)
-	} else {
-		for {
-			header, eventData, err := fileReader.getNextEvent()
-			if err != nil {
-				if err != io.EOF {
-					message := fmt.Errorf("error reading event: %w", err)
-					logger.Error(message.Error())
-				}
-				break
+	for {
+		header, eventData, err := fileReader.getNextEvent()
+		if err != nil {
+			if err != io.EOF {
+				message := fmt.Errorf("error reading event: %w", err)
+				logger.Error(message.Error())
 			}
-			processEvent(eventData, header, writer, writer2)
+			break
 		}
+		decodedEvent := decodeEvent(eventData, header)
+		decodedEvents = append(decodedEvents, decodedEvent)
 	}
-	duration := time.Since(start)
-	fmt.Printf("Total time: %d ms\n", duration.Milliseconds())
+	fmt.Println("Total events processed: ", len(decodedEvents))
+
+	// Write files in infinite loop
+	nLoop := 0
+	for {
+		start := time.Now()
+		fmt.Println("Loop number: ", nLoop)
+
+		// Create writers
+		var writer, writer2 *decoder.Writer
+		//var writer *decoder.Writer
+		writer = decoder.NewWriter(configuration.FileOut)
+		if configuration.SplitTrg {
+			writer2 = decoder.NewWriter(configuration.FileOut2)
+		}
+
+		for i, event := range decodedEvents {
+			fmt.Println("Writing event: ", i, event.EventID)
+			decoder.ProcessDecodedEvent(event, configuration, writer, writer2)
+		}
+
+		writer.Close()
+		if configuration.SplitTrg {
+			writer2.Close()
+		}
+
+		//		if nLoop == 35000 {
+		//			time.Sleep(100 * time.Minute)
+		//		}
+
+		duration := time.Since(start)
+		fmt.Printf("Total time: %d ms\n", duration.Milliseconds())
+		nLoop++
+	}
 }
 
 func processEvent(eventData []byte, header decoder.EventHeaderStruct, writer *decoder.Writer, writer2 *decoder.Writer) {
@@ -156,4 +165,29 @@ func numberOfEventsToProcess(fileEvtCount int, skipEvts int, maxEvtCount int) in
 		evtsToRead = fileEvtCount
 	}
 	return evtsToRead
+}
+
+func decodeEvent(eventData []byte, header decoder.EventHeaderStruct) decoder.EventType {
+	defer func() {
+		if r := recover(); r != nil {
+			eventID := decoder.EventIdGetNbInRun(header.EventId)
+			errMessage := fmt.Errorf("decoder recovered from panic on event %d: %v", eventID, r)
+			logger.Error(errMessage.Error())
+			message := fmt.Sprintf("discarding event %d", eventID)
+			logger.Error(message)
+		}
+	}()
+
+	event, err := decoder.ReadGDC(eventData, header)
+	if err != nil {
+		message := fmt.Errorf("error reading GDC data: %w", err)
+		logger.Error(message.Error())
+		return decoder.EventType{Error: true}
+	}
+	if event.Error && DiscardErrors {
+		message := fmt.Sprintf("discarding event %d", event.EventID)
+		logger.Error(message)
+		return decoder.EventType{Error: true}
+	}
+	return event
 }
