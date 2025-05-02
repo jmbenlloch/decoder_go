@@ -46,14 +46,15 @@ func NewWriter(filename string) *Writer {
 	// So far we are not using Blosc
 	if configuration.UseBlosc {
 		blosc_version, blosc_date, err := hdf5.RegisterBlosc()
-		fmt.Println("Blosc version: ", blosc_version, " date: ", blosc_date)
+		_ = blosc_version
+		_ = blosc_date
+		//fmt.Println("Blosc version: ", blosc_version, " date: ", blosc_date)
 		if err != nil {
 			logger.Error(err.Error())
 		}
 	}
 
 	writer := &Writer{}
-	fmt.Println("hdf5writer: Creating file: ", filename)
 	writer.File = openFile(filename)
 	writer.Filename = filename
 	writer.RunGroup = createGroup(writer.File, "Run")
@@ -318,7 +319,6 @@ func writeBaselines(dset *hdf5.Dataset, baselines map[uint16]uint16,
 }
 
 func (w *Writer) Close() error {
-	fmt.Println("Closing file hdf writer ", w.Filename)
 	var errs []error
 
 	if w.EventTable != nil {
