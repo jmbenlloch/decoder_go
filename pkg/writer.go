@@ -39,7 +39,7 @@ type Writer struct {
 
 const N_TRG_CH = 48
 
-func NewWriter(filename string) *Writer {
+func NewWriter(filename string) (*Writer, error) {
 	// Set string size for HDF5
 	hdf5.SetStringLength(STRLEN)
 
@@ -54,22 +54,61 @@ func NewWriter(filename string) *Writer {
 		}
 	}
 
+	var err error
 	writer := &Writer{}
-	writer.File = openFile(filename)
+	writer.File, err = openFile(filename)
+	if err != nil {
+		return nil, err
+	}
 	writer.Filename = filename
-	writer.RunGroup = createGroup(writer.File, "Run")
-	writer.RDGroup = createGroup(writer.File, "RD")
-	writer.SensorsGroup = createGroup(writer.File, "Sensors")
-	writer.TriggerGroup = createGroup(writer.File, "Trigger")
-	writer.EventTable = createTable(writer.RunGroup, "events", EventDataHDF5{})
-	writer.RunInfoTable = createTable(writer.RunGroup, "runInfo", RunInfoHDF5{})
-	writer.TriggerParamsTable = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
-	writer.TriggerLostTable = createTable(writer.TriggerGroup, "triggerLost", TriggerLostHDF5{})
-	writer.TriggerTypeTable = createTable(writer.TriggerGroup, "trigger", TriggerTypeHDF5{})
-	writer.PmtMappingTable = createTable(writer.SensorsGroup, "DataPMT", SensorMappingHDF5{})
-	writer.SipmMappingTable = createTable(writer.SensorsGroup, "DataSiPM", SensorMappingHDF5{})
+
+	errs := make([]error, 0)
+	writer.RunGroup, err = createGroup(writer.File, "Run")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.RDGroup, err = createGroup(writer.File, "RD")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.SensorsGroup, err = createGroup(writer.File, "Sensors")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.TriggerGroup, err = createGroup(writer.File, "Trigger")
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.EventTable, err = createTable(writer.RunGroup, "events", EventDataHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.RunInfoTable, err = createTable(writer.RunGroup, "runInfo", RunInfoHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.TriggerParamsTable, err = createTable(writer.TriggerGroup, "configuration", TriggerParamsHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.TriggerLostTable, err = createTable(writer.TriggerGroup, "triggerLost", TriggerLostHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.TriggerTypeTable, err = createTable(writer.TriggerGroup, "trigger", TriggerTypeHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.PmtMappingTable, err = createTable(writer.SensorsGroup, "DataPMT", SensorMappingHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
+	writer.SipmMappingTable, err = createTable(writer.SensorsGroup, "DataSiPM", SensorMappingHDF5{})
+	if err != nil {
+		errs = append(errs, err)
+	}
 	writer.EvtCounter = 0
-	return writer
+	return writer, err
 }
 
 func sortSensorsBySensorID(sensorsFromElecIDToSensorID map[uint16]uint16) []SensorMappingHDF5 {

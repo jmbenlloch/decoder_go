@@ -40,20 +40,28 @@ func convertToHdf5String(s string) [STRLEN]byte {
 	return byteArray
 }
 
-func openFile(fname string) *hdf5.File {
+func openFile(fname string) (*hdf5.File, error) {
 	f, err := hdf5.CreateFile(fname, hdf5.F_ACC_TRUNC)
 	if err != nil {
 		logger.Error(err.Error())
+		err = &ErrOpenFile{
+			Filename: fname,
+			Err:      err,
+		}
 	}
-	return f
+	return f, err
 }
 
-func createGroup(file *hdf5.File, groupName string) *hdf5.Group {
+func createGroup(file *hdf5.File, groupName string) (*hdf5.Group, error) {
 	g, err := file.CreateGroup(groupName)
 	if err != nil {
 		logger.Error(err.Error())
+		err = &ErrCreateGroup{
+			GroupName: groupName,
+			Err:       err,
+		}
 	}
-	return g
+	return g, err
 }
 
 func create3dArray(group *hdf5.Group, name string, nSensors int, nSamples int) *hdf5.Dataset {
@@ -124,25 +132,36 @@ func createArray(group *hdf5.Group, name string, dims []uint, maxDims []uint, ch
 	return dsetArray
 }
 
-func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dataset {
+func errorCreateTable(name string, err error) error {
+	logger.Error(err.Error())
+	return &ErrCreateTable{
+		TableName: name,
+		Err:       err,
+	}
+}
+
+func createTable(group *hdf5.Group, name string, datatype interface{}) (*hdf5.Dataset, error) {
 	dims := []uint{0}
 	unlimitedDims := -1 // H5S_UNLIMITED is -1L
 	maxDims := []uint{uint(unlimitedDims)}
 	file_space, err := hdf5.CreateSimpleDataspace(dims, maxDims)
 	if err != nil {
-		panic(err)
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	// create property list
 	plist, err := hdf5.NewPropList(hdf5.P_DATASET_CREATE)
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	chunks := []uint{32768}
 	err = plist.SetChunk(chunks)
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	// Set compression level
@@ -152,40 +171,43 @@ func createTable(group *hdf5.Group, name string, datatype interface{}) *hdf5.Dat
 		err = plist.SetDeflate(configuration.CompressionLevel)
 	}
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	// create the memory data type
 	dtype, err := hdf5.NewDatatypeFromValue(datatype)
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	// create the dataset
 	dset, err := group.CreateDatasetWith(name, dtype, file_space, plist)
 	if err != nil {
-		logger.Error(err.Error())
-	}
-	if err != nil {
-		panic(err)
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	err = plist.Close()
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	err = file_space.Close()
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
 	err = dtype.Close()
 	if err != nil {
-		logger.Error(err.Error())
+		err = errorCreateTable(name, err)
+		return nil, err
 	}
 
-	return dset
+	return dset, err
 }
 
 func writeEntryToTable[T any](dataset *hdf5.Dataset, data T, evtCounter int) {

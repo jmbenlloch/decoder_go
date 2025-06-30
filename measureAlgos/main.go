@@ -121,7 +121,12 @@ func main() {
 				configuration.CompressionLevel = compressionLevel
 				decoder.SetConfiguration(configuration)
 				start := time.Now()
-				writer := decoder.NewWriter(configuration.FileOut)
+				writer, err := decoder.NewWriter(configuration.FileOut)
+				if err != nil {
+					message := fmt.Errorf("Error creating writer for output file: %w", err)
+					logger.Error(message.Error())
+					return
+				}
 				processWorkerResults(decodedEvents, writer)
 				writer.Close()
 				duration := time.Since(start)
@@ -139,7 +144,12 @@ func main() {
 				configuration.CompressionLevel = compressionLevel
 				decoder.SetConfiguration(configuration)
 				start := time.Now()
-				writer := decoder.NewWriter(configuration.FileOut)
+				writer, err := decoder.NewWriter(configuration.FileOut)
+				if err != nil {
+					message := fmt.Errorf("Error creating writer for output file: %w", err)
+					logger.Error(message.Error())
+					return
+				}
 				processWorkerResults(decodedEvents, writer)
 				writer.Close()
 				duration := time.Since(start)

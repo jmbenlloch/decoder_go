@@ -75,9 +75,19 @@ func main() {
 
 	// Create writers
 	var writer, writer2 *decoder.Writer
-	writer = decoder.NewWriter(configuration.FileOut)
+	writer, err = decoder.NewWriter(configuration.FileOut)
+	if err != nil {
+		message := fmt.Errorf("Error creating writer for output file: %w", err)
+		logger.Error(message.Error())
+		return
+	}
 	if configuration.SplitTrg {
-		writer2 = decoder.NewWriter(configuration.FileOut2)
+		writer2, err = decoder.NewWriter(configuration.FileOut2)
+		if err != nil {
+			message := fmt.Errorf("Error creating writer for second output file: %w", err)
+			logger.Error(message.Error())
+			return
+		}
 		defer writer2.Close()
 	}
 	defer writer.Close()
