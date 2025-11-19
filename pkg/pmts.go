@@ -278,12 +278,24 @@ func processPmtIds(event *EventType, configuration Configuration) {
 		// 712 - 723 -> 700 - 711 Dual
 
 		// Dual channel
-		if elecID%100 >= 12 {
-			newid := elecID - 12
-			event.BlrWaveforms[newid] = waveform
-			event.BlrBaselines[newid] = event.Baselines[elecID]
-			delete(event.PmtWaveforms, elecID)
-			delete(event.Baselines, elecID)
+		if event.PmtConfig.DualMode {
+			if elecID%100 >= 12 {
+				newid := elecID - 12
+				event.BlrWaveforms[newid] = waveform
+				event.BlrBaselines[newid] = event.Baselines[elecID]
+				delete(event.PmtWaveforms, elecID)
+				delete(event.Baselines, elecID)
+			}
+		}
+
+		// High-low gain channels
+		if event.PmtConfig.ChannelsHG {
+			if elecID%2 == 1 {
+				event.BlrWaveforms[elecID] = waveform
+				event.BlrBaselines[elecID] = event.Baselines[elecID]
+				delete(event.PmtWaveforms, elecID)
+				delete(event.Baselines, elecID)
+			}
 		}
 	}
 }

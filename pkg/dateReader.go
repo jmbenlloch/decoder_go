@@ -142,6 +142,11 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 			}
 			if configuration.ReadPMTs {
 				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				event.PmtConfig = PmtConfig{
+					Baselines:  evtFormat.Baseline,
+					DualMode:   evtFormat.DualModeBit,
+					ChannelsHG: evtFormat.ChannelsHG,
+				}
 			}
 		case 1:
 			if configuration.Verbosity > 1 {

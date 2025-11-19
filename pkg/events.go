@@ -13,6 +13,7 @@ type EventType struct {
 	// Trigger type is not written correctly in the trigger FEC
 	// the value has to be retrieved from the NEXT headers from PMT or SiPM
 	TriggerType    uint16
+	PmtConfig      PmtConfig
 	ExtTrgWaveform *[]int16
 	PmtSumWaveform *[]int16
 	PmtSumBaseline uint16
@@ -29,4 +30,10 @@ type SensorsMap struct {
 type SensorMapping struct {
 	ToElecID   map[uint16]uint16
 	ToSensorID map[uint16]uint16
+}
+
+type PmtConfig struct {
+	Baselines  bool
+	DualMode   bool
+	ChannelsHG bool
 }

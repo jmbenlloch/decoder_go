@@ -25,6 +25,7 @@ type Writer struct {
 	TriggerLostTable   *hdf5.Dataset
 	TriggerChannels    *hdf5.Dataset
 	PmtMappingTable    *hdf5.Dataset
+	BlrMappingTable    *hdf5.Dataset
 	SipmMappingTable   *hdf5.Dataset
 	PmtWaveforms       *hdf5.Dataset
 	BlrWaveforms       *hdf5.Dataset
@@ -170,13 +171,14 @@ func (w *Writer) WriteEvent(event *EventType) {
 		trigger_type: int32(event.TriggerType),
 	}, w.EvtCounter)
 
-	var pmtSorted, sipmSorted []SensorMappingHDF5
+	var pmtSorted, blrSorted, sipmSorted []SensorMappingHDF5
 	var nPmts, nBlrs, nSipms int
 	var pmtSamples, sipmSamples int
 	var nTrgChs int
 
 	if configuration.NoDB {
 		pmtSorted = sortSensorsByElecID(event.PmtWaveforms)
+		blrSorted = sortSensorsByElecID(event.BlrWaveforms)
 		sipmSorted = sortSensorsByElecID(event.SipmWaveforms)
 		nPmts = len(event.PmtWaveforms)
 		nSipms = len(event.SipmWaveforms)
@@ -212,7 +214,6 @@ func (w *Writer) WriteEvent(event *EventType) {
 		writeEntryToTable(w.RunInfoTable, RunInfoHDF5{run_number: int32(event.RunNumber)}, w.EvtCounter)
 		writeArrayToTable(w.PmtMappingTable, &pmtSorted, w.EvtCounter)
 		writeArrayToTable(w.SipmMappingTable, &sipmSorted, w.EvtCounter)
-
 		w.writeTriggerConfiguration(event.TriggerConfig)
 
 		w.TriggerChannels = create2dArray(w.TriggerGroup, "events", nTrgChs)
@@ -237,8 +238,10 @@ func (w *Writer) WriteEvent(event *EventType) {
 		}
 
 		if len(event.BlrWaveforms) > 0 {
-			w.BlrWaveforms = create3dArray(w.RDGroup, "pmt_blr", nPmts, pmtSamples)
+			w.BlrWaveforms = create3dArray(w.RDGroup, "pmtblr", nPmts, pmtSamples)
 			w.BlrBaselines = create2dArray(w.RDGroup, "blr_baselines", nPmts)
+			w.BlrMappingTable, _ = createTable(w.SensorsGroup, "DataBLR", SensorMappingHDF5{})
+			writeArrayToTable(w.BlrMappingTable, &blrSorted, w.EvtCounter)
 		}
 
 		w.FirstEvt = true
@@ -256,7 +259,7 @@ func (w *Writer) WriteEvent(event *EventType) {
 		// it works well when reading the channel map from DB
 		// in no-DB mode, if there is a dual channel of a missing normal channel,
 		// it will not be written.
-		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, pmtSorted, w.EvtCounter, nPmts, pmtSamples)
+		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, blrSorted, w.EvtCounter, nBlrs, pmtSamples)
 		writeBaselines(w.BlrBaselines, event.BlrBaselines, pmtSorted, w.EvtCounter, nPmts)
 	}
 	if nSipms > 0 {
@@ -413,6 +416,11 @@ func (w *Writer) Close() error {
 	if w.PmtMappingTable != nil {
 		if err := w.PmtMappingTable.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("error closing PMT mapping table: %w", err))
+		}
+	}
+	if w.BlrMappingTable != nil {
+		if err := w.BlrMappingTable.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing BLR mapping table: %w", err))
 		}
 	}
 	if w.SipmMappingTable != nil {
