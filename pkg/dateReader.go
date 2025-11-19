@@ -54,11 +54,15 @@ func ReadGDC(eventData []byte, header EventHeaderStruct) (EventType, error) {
 	var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 
 	event := EventType{
-		PmtWaveforms:  make(map[uint16][]int16),
-		BlrWaveforms:  make(map[uint16][]int16),
-		SipmWaveforms: make(map[uint16][]int16),
-		Baselines:     make(map[uint16]uint16),
-		BlrBaselines:  make(map[uint16]uint16),
+		PmtWaveforms:     make(map[uint16][]int16),
+		BlrWaveforms:     make(map[uint16][]int16),
+		SipmWaveforms:    make(map[uint16][]int16),
+		FibersLG:         make(map[uint16][]int16),
+		FibersHG:         make(map[uint16][]int16),
+		Baselines:        make(map[uint16]uint16),
+		BlrBaselines:     make(map[uint16]uint16),
+		FiberBaselinesLG: make(map[uint16]uint16),
+		FiberBaselinesHG: make(map[uint16]uint16),
 	}
 	event.RunNumber = uint32(header.EventRunNb)
 	event.EventID = EventIdGetNbInRun(header.EventId)
@@ -75,6 +79,7 @@ func ReadGDC(eventData []byte, header EventHeaderStruct) (EventType, error) {
 	}
 
 	processPmtIds(&event, configuration)
+	processFiberIds(&event, configuration)
 	return event, nil
 }
 
@@ -142,6 +147,11 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 			}
 			if configuration.ReadPMTs {
 				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				event.PmtConfig = PmtConfig{
+					Baselines:  evtFormat.Baseline,
+					DualMode:   evtFormat.DualModeBit,
+					ChannelsHG: evtFormat.ChannelsHG,
+				}
 			}
 		case 1:
 			if configuration.Verbosity > 1 {
@@ -158,6 +168,18 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 			}
 			if configuration.ReadTrigger {
 				ReadTriggerFEC(payload[evtFormat.HeaderSize:], event)
+			}
+		case 3:
+			if configuration.Verbosity > 1 {
+				message := fmt.Sprintf("Fiber FEC %d (0x%02x)", evtFormat.FecID, evtFormat.FecID)
+				logger.Info(message, "dateReader")
+			}
+			if configuration.ReadFibers {
+				ReadFiberFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				event.FiberConfig = FiberConfig{
+					Baselines:  evtFormat.Baseline,
+					ChannelsHG: evtFormat.ChannelsHG,
+				}
 			}
 		}
 	default:

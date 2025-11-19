@@ -18,6 +18,7 @@ func LoadConfiguration(filename string) (decoder.Configuration, error) {
 	config.TrgCode1 = 1
 	config.TrgCode2 = 9
 	config.ReadPMTs = true
+	config.ReadFibers = true
 	config.ReadSiPMs = true
 	config.ReadTrigger = true
 	config.SplitTrg = false
