@@ -12,6 +12,7 @@ type Configuration struct {
 	TrgCode2         int            `json:"trg_code2"`
 	ReadPMTs         bool           `json:"read_pmts"`
 	ReadSiPMs        bool           `json:"read_sipms"`
+	ReadFibers       bool           `json:"read_fibers"`
 	ReadTrigger      bool           `json:"read_trigger"`
 	SplitTrg         bool           `json:"split_trg"`
 	NoDB             bool           `json:"no_db"`
