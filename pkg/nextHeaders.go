@@ -91,9 +91,6 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 	ChannelsHG := (data[position] & 0x08000) >> 15
 	position++
 
-	// TODO: remove
-	ChannelsHG = 1
-
 	if configuration.Verbosity > 2 {
 		message := fmt.Sprintf("FecType: 0x%02x", FecType)
 		logger.Info(message, "nextHeader")

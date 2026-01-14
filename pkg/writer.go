@@ -11,31 +11,37 @@ import (
 )
 
 type Writer struct {
-	File               *hdf5.File
-	Filename           string
-	FirstEvt           bool
-	RunGroup           *hdf5.Group
-	RDGroup            *hdf5.Group
-	SensorsGroup       *hdf5.Group
-	TriggerGroup       *hdf5.Group
-	EventTable         *hdf5.Dataset
-	RunInfoTable       *hdf5.Dataset
-	TriggerParamsTable *hdf5.Dataset
-	TriggerTypeTable   *hdf5.Dataset
-	TriggerLostTable   *hdf5.Dataset
-	TriggerChannels    *hdf5.Dataset
-	PmtMappingTable    *hdf5.Dataset
-	BlrMappingTable    *hdf5.Dataset
-	SipmMappingTable   *hdf5.Dataset
-	PmtWaveforms       *hdf5.Dataset
-	BlrWaveforms       *hdf5.Dataset
-	ExtTrgWaveform     *hdf5.Dataset
-	PmtSumWaveform     *hdf5.Dataset
-	PmtSumBaseline     *hdf5.Dataset
-	SipmWaveforms      *hdf5.Dataset
-	Baselines          *hdf5.Dataset
-	BlrBaselines       *hdf5.Dataset
-	EvtCounter         int
+	File                *hdf5.File
+	Filename            string
+	FirstEvt            bool
+	RunGroup            *hdf5.Group
+	RDGroup             *hdf5.Group
+	SensorsGroup        *hdf5.Group
+	TriggerGroup        *hdf5.Group
+	EventTable          *hdf5.Dataset
+	RunInfoTable        *hdf5.Dataset
+	TriggerParamsTable  *hdf5.Dataset
+	TriggerTypeTable    *hdf5.Dataset
+	TriggerLostTable    *hdf5.Dataset
+	TriggerChannels     *hdf5.Dataset
+	PmtMappingTable     *hdf5.Dataset
+	BlrMappingTable     *hdf5.Dataset
+	SipmMappingTable    *hdf5.Dataset
+	PmtWaveforms        *hdf5.Dataset
+	BlrWaveforms        *hdf5.Dataset
+	ExtTrgWaveform      *hdf5.Dataset
+	PmtSumWaveform      *hdf5.Dataset
+	PmtSumBaseline      *hdf5.Dataset
+	SipmWaveforms       *hdf5.Dataset
+	FiberWaveformsLG    *hdf5.Dataset
+	FiberWaveformsHG    *hdf5.Dataset
+	Baselines           *hdf5.Dataset
+	BlrBaselines        *hdf5.Dataset
+	FiberBaselinesLG    *hdf5.Dataset
+	FiberBaselinesHG    *hdf5.Dataset
+	FiberMappingTableLG *hdf5.Dataset
+	FiberMappingTableHG *hdf5.Dataset
+	EvtCounter          int
 }
 
 const N_TRG_CH = 48
@@ -171,15 +177,17 @@ func (w *Writer) WriteEvent(event *EventType) {
 		trigger_type: int32(event.TriggerType),
 	}, w.EvtCounter)
 
-	var pmtSorted, blrSorted, sipmSorted []SensorMappingHDF5
-	var nPmts, nBlrs, nSipms int
-	var pmtSamples, sipmSamples int
+	var pmtSorted, blrSorted, sipmSorted, fiberLGSorted, fiberHGSorted []SensorMappingHDF5
+	var nPmts, nBlrs, nSipms, nFibersLG, nFibersHG int
+	var pmtSamples, sipmSamples, fiberSamples int
 	var nTrgChs int
 
 	if configuration.NoDB {
 		pmtSorted = sortSensorsByElecID(event.PmtWaveforms)
 		blrSorted = sortSensorsByElecID(event.BlrWaveforms)
 		sipmSorted = sortSensorsByElecID(event.SipmWaveforms)
+		fiberLGSorted = sortSensorsByElecID(event.FibersLG)
+		fiberHGSorted = sortSensorsByElecID(event.FibersHG)
 		nPmts = len(event.PmtWaveforms)
 		nSipms = len(event.SipmWaveforms)
 		nTrgChs = N_TRG_CH
@@ -191,6 +199,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 		nTrgChs = nPmts
 	}
 	nBlrs = len(event.BlrWaveforms)
+	nFibersLG = len(event.FibersLG)
+	nFibersHG = len(event.FibersHG)
 
 	if nPmts > 0 {
 		if len(event.PmtWaveforms) > 0 {
@@ -207,6 +217,18 @@ func (w *Writer) WriteEvent(event *EventType) {
 			sipmSamples = len(randomSipm)
 		} else {
 			sipmSamples = 1
+		}
+	}
+
+	if nFibersLG > 0 || nFibersHG > 0 {
+		if len(event.FibersLG) > 0 {
+			randomFiber := maps.Values(event.FibersLG)[0]
+			fiberSamples = len(randomFiber)
+		} else if len(event.FibersHG) > 0 {
+			randomFiber := maps.Values(event.FibersHG)[0]
+			fiberSamples = len(randomFiber)
+		} else {
+			fiberSamples = 1
 		}
 	}
 
@@ -244,6 +266,20 @@ func (w *Writer) WriteEvent(event *EventType) {
 			writeArrayToTable(w.BlrMappingTable, &blrSorted, w.EvtCounter)
 		}
 
+		if len(event.FibersLG) > 0 {
+			w.FiberWaveformsLG = create3dArray(w.RDGroup, "fiberrwf_lg", nFibersLG, fiberSamples)
+			w.FiberBaselinesLG = create2dArray(w.RDGroup, "fiber_baselines_lg", nFibersLG)
+			w.FiberMappingTableLG, _ = createTable(w.SensorsGroup, "DataFiberLG", SensorMappingHDF5{})
+			writeArrayToTable(w.FiberMappingTableLG, &fiberLGSorted, w.EvtCounter)
+		}
+
+		if len(event.FibersHG) > 0 {
+			w.FiberWaveformsHG = create3dArray(w.RDGroup, "fiberrwf_hg", nFibersHG, fiberSamples)
+			w.FiberBaselinesHG = create2dArray(w.RDGroup, "fiber_baselines_hg", nFibersHG)
+			w.FiberMappingTableHG, _ = createTable(w.SensorsGroup, "DataFiberHG", SensorMappingHDF5{})
+			writeArrayToTable(w.FiberMappingTableHG, &fiberHGSorted, w.EvtCounter)
+		}
+
 		w.FirstEvt = true
 	}
 
@@ -264,6 +300,14 @@ func (w *Writer) WriteEvent(event *EventType) {
 	}
 	if nSipms > 0 {
 		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, w.EvtCounter, nSipms, sipmSamples)
+	}
+	if nFibersLG > 0 {
+		writeWaveforms(w.FiberWaveformsLG, event.FibersLG, fiberLGSorted, w.EvtCounter, nFibersLG, fiberSamples)
+		writeBaselines(w.FiberBaselinesLG, event.FiberBaselinesLG, fiberLGSorted, w.EvtCounter, nFibersLG)
+	}
+	if nFibersHG > 0 {
+		writeWaveforms(w.FiberWaveformsHG, event.FibersHG, fiberHGSorted, w.EvtCounter, nFibersHG, fiberSamples)
+		writeBaselines(w.FiberBaselinesHG, event.FiberBaselinesHG, fiberHGSorted, w.EvtCounter, nFibersHG)
 	}
 	if event.ExtTrgWaveform != nil {
 		writeSingleWaveform(w.ExtTrgWaveform, event.ExtTrgWaveform, w.EvtCounter)
@@ -388,6 +432,26 @@ func (w *Writer) Close() error {
 			errs = append(errs, fmt.Errorf("error closing SiPM waveforms: %w", err))
 		}
 	}
+	if w.FiberWaveformsLG != nil {
+		if err := w.FiberWaveformsLG.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing Fiber LG waveforms: %w", err))
+		}
+	}
+	if w.FiberWaveformsHG != nil {
+		if err := w.FiberWaveformsHG.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing Fiber HG waveforms: %w", err))
+		}
+	}
+	if w.FiberBaselinesLG != nil {
+		if err := w.FiberBaselinesLG.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing Fiber LG baselines: %w", err))
+		}
+	}
+	if w.FiberBaselinesHG != nil {
+		if err := w.FiberBaselinesHG.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing Fiber HG baselines: %w", err))
+		}
+	}
 	if w.ExtTrgWaveform != nil {
 		if err := w.ExtTrgWaveform.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("error closing external trigger waveform: %w", err))
@@ -426,6 +490,16 @@ func (w *Writer) Close() error {
 	if w.SipmMappingTable != nil {
 		if err := w.SipmMappingTable.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("error closing SiPM mapping table: %w", err))
+		}
+	}
+	if w.FiberMappingTableLG != nil {
+		if err := w.FiberMappingTableLG.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing Fiber LG mapping table: %w", err))
+		}
+	}
+	if w.FiberMappingTableHG != nil {
+		if err := w.FiberMappingTableHG.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("error closing Fiber HG mapping table: %w", err))
 		}
 	}
 	if w.TriggerParamsTable != nil {

@@ -54,12 +54,15 @@ func ReadGDC(eventData []byte, header EventHeaderStruct) (EventType, error) {
 	var sipmPayloads map[uint16][]uint16 = make(map[uint16][]uint16)
 
 	event := EventType{
-		PmtWaveforms:   make(map[uint16][]int16),
-		BlrWaveforms:   make(map[uint16][]int16),
-		SipmWaveforms:  make(map[uint16][]int16),
-		FiberWaveforms: make(map[uint16][]int16),
-		Baselines:      make(map[uint16]uint16),
-		BlrBaselines:   make(map[uint16]uint16),
+		PmtWaveforms:     make(map[uint16][]int16),
+		BlrWaveforms:     make(map[uint16][]int16),
+		SipmWaveforms:    make(map[uint16][]int16),
+		FibersLG:         make(map[uint16][]int16),
+		FibersHG:         make(map[uint16][]int16),
+		Baselines:        make(map[uint16]uint16),
+		BlrBaselines:     make(map[uint16]uint16),
+		FiberBaselinesLG: make(map[uint16]uint16),
+		FiberBaselinesHG: make(map[uint16]uint16),
 	}
 	event.RunNumber = uint32(header.EventRunNb)
 	event.EventID = EventIdGetNbInRun(header.EventId)
@@ -76,6 +79,7 @@ func ReadGDC(eventData []byte, header EventHeaderStruct) (EventType, error) {
 	}
 
 	processPmtIds(&event, configuration)
+	processFiberIds(&event, configuration)
 	return event, nil
 }
 
@@ -171,7 +175,7 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 				logger.Info(message, "dateReader")
 			}
 			if configuration.ReadFibers {
-				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				ReadFiberFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
 			}
 		}
 	default:

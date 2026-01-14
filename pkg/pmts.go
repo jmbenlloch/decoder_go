@@ -24,17 +24,9 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 	var nextFT int32 = -1 //At start we don't know next FT value
 	var nextFThm int32 = -1
 
-	// Select the appropriate waveforms map based on FEC type
-	var waveformsMap map[uint16][]int16
-	if evtFormat.FecType == 3 {
-		waveformsMap = event.FiberWaveforms
-	} else {
-		waveformsMap = event.PmtWaveforms
-	}
-
 	channelMask, chPositions := pmtsChannelMask(evtFormat)
-	initializeWaveforms(waveformsMap, channelMask, bufferSamples)
-	wfPointers := computePmtWaveformPointerArray(waveformsMap, channelMask, chPositions)
+	initializeWaveforms(event.PmtWaveforms, channelMask, bufferSamples)
+	wfPointers := computePmtWaveformPointerArray(event.PmtWaveforms, channelMask, chPositions)
 
 	// Write pedestal
 	if Baseline {
