@@ -42,11 +42,13 @@ def plot_waveforms(waveforms, sensors, baselines, evt, *, wf_type="PMT", range=(
 
     wfsize = waveforms.shape[2]
     time = np.arange(wfsize).astype(float)
-    if   wf_type == "PMT" : time /= 40
-    elif wf_type == "BLR" : time /= 40
-    elif wf_type == "SiPM": pass
+    if   wf_type == "PMT"    : time /= 40
+    elif wf_type == "BLR"    : time /= 40
+    elif wf_type == "SiPM"   : pass
+    elif wf_type == "FiberHG": time /= 40
+    elif wf_type == "FiberLG": time /= 40
     else: raise ValueError("Unrecognized wf type {}. ".format(wf_type) +
-                           "Valid options: are 'PMT', 'BLR' and 'SiPM'")
+                           "Valid options: are 'PMT', 'BLR', 'SiPM', 'FiberHG' and 'FiberLG'")
 
     if sum: wf_type += " SUM"
 
@@ -110,6 +112,7 @@ def plot_waveforms(waveforms, sensors, baselines, evt, *, wf_type="PMT", range=(
 
 
 def plot_file(filename, rwf=True, blr=True, sipm=True, sipm_range=(None,),
+              fiber_hg=False, fiber_lg=False,
               overlay=False, sum=False, first=0, pmt_sum=True,
               zoomx=False, zoomy=False, dual=False, elecid=False, trg=56000):
     with tb.open_file(filename) as file:
@@ -163,6 +166,20 @@ def plot_file(filename, rwf=True, blr=True, sipm=True, sipm_range=(None,),
                                overlay=overlay, sum=sum,
                                zoomx=zoomx, zoomy=zoomy, dual=dual, trg=trg)
 
+            if fiber_hg and "RD/fiberrwf_hg" in file.root and "Sensors/DataFiberHG" in file.root:
+                plot_waveforms(file.root.RD     .fiberrwf_hg [evt : evt + evt_step],
+                               file.root.Sensors.DataFiberHG[:], [],
+                               evt_number, wf_type="FiberHG",
+                               overlay=overlay, sum=sum,
+                               zoomx=zoomx, zoomy=zoomy, dual=dual, trg=trg)
+
+            if fiber_lg and "RD/fiberrwf_lg" in file.root and "Sensors/DataFiberLG" in file.root:
+                plot_waveforms(file.root.RD     .fiberrwf_lg [evt : evt + evt_step],
+                               file.root.Sensors.DataFiberLG[:], [],
+                               evt_number, wf_type="FiberLG",
+                               overlay=overlay, sum=sum,
+                               zoomx=zoomx, zoomy=zoomy, dual=dual, trg=trg)
+
 
 if __name__ == '__main__':
     def sipm_index(sensor_id):
@@ -178,6 +195,8 @@ if __name__ == '__main__':
     parser.add_argument( "-pmt-sum"   , action="store_true")
     parser.add_argument( "-blr"       , action="store_true")
     parser.add_argument( "-sipm"      , action="store_true")
+    parser.add_argument( "-fiber-hg"  , action="store_true")
+    parser.add_argument( "-fiber-lg"  , action="store_true")
     #parser.add_argument("--sipm-range", type=sipm_index, default=(None,), nargs="*")
     parser.add_argument("--sipm-range", type=int, default=(None,), nargs="*")
 
@@ -195,6 +214,7 @@ if __name__ == '__main__':
 
     plot_file(filename,
               rwf=args.pmt, blr=args.blr, sipm=args.sipm, sipm_range=args.sipm_range,
+              fiber_hg=args.fiber_hg, fiber_lg=args.fiber_lg,
               overlay=args.overlay, sum=args.sum, first=args.first, pmt_sum=args.pmt_sum,
               zoomx=args.zoomx, zoomy=args.zoomy, dual=args.dual, elecid=args.elecid,
               trg=args.trg)
