@@ -176,6 +176,10 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 			}
 			if configuration.ReadFibers {
 				ReadFiberFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
+				event.FiberConfig = FiberConfig{
+					Baselines:  evtFormat.Baseline,
+					ChannelsHG: evtFormat.ChannelsHG,
+				}
 			}
 		}
 	default:

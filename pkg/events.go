@@ -18,6 +18,7 @@ type EventType struct {
 	// the value has to be retrieved from the NEXT headers from PMT or SiPM
 	TriggerType    uint16
 	PmtConfig      PmtConfig
+	FiberConfig    FiberConfig
 	ExtTrgWaveform *[]int16
 	PmtSumWaveform *[]int16
 	PmtSumBaseline uint16
@@ -39,5 +40,10 @@ type SensorMapping struct {
 type PmtConfig struct {
 	Baselines  bool
 	DualMode   bool
+	ChannelsHG bool
+}
+
+type FiberConfig struct {
+	Baselines  bool
 	ChannelsHG bool
 }

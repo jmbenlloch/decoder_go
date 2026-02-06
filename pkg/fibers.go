@@ -168,7 +168,7 @@ func writeFiberPedestals(evtFormat *EventFormat, channelMask []uint16, baselines
 func processFiberIds(event *EventType, configuration Configuration) {
 	if configuration.Verbosity > 2 {
 		message := fmt.Sprintf("processFiberIds: Initial FibersLG count=%d, ChannelsHG=%t",
-			len(event.FibersLG), event.PmtConfig.ChannelsHG)
+			len(event.FibersLG), event.FiberConfig.ChannelsHG)
 		logger.Info(message, "fibers")
 	}
 
@@ -176,12 +176,16 @@ func processFiberIds(event *EventType, configuration Configuration) {
 	for elecID, waveform := range event.FibersLG {
 		// High-low gain channels
 		// Odd channels (101, 103, 105, ...) -> High Gain
-		if event.PmtConfig.ChannelsHG {
+		if event.FiberConfig.ChannelsHG {
 			if elecID%2 == 1 {
 				event.FibersHG[elecID] = waveform
 				event.FiberBaselinesHG[elecID] = event.FiberBaselinesLG[elecID]
 				delete(event.FibersLG, elecID)
 				delete(event.FiberBaselinesLG, elecID)
+				if configuration.Verbosity > 2 {
+					message := fmt.Sprintf("ChannelsHG: Moved elecID %d to FibersHG", elecID)
+					logger.Info(message, "fibers")
+				}
 			}
 		}
 	}
