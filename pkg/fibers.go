@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func ReadFiberFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct, event *EventType) {
+func ReadFiberFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct, event *EventType) error {
 	position := 0
 	var time int = -1
 	var current_bit int = 31
@@ -30,7 +30,11 @@ func ReadFiberFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeader
 	var nextFT int32 = -1 //At start we don't know next FT value
 	var nextFThm int32 = -1
 
-	channelMask, chPositions := fibersChannelMask(evtFormat)
+	channelMask, chPositions, err := fibersChannelMask(evtFormat)
+	if err != nil {
+		logger.Error(err.Error())
+		return err
+	}
 	initializeWaveforms(event.FibersLG, channelMask, bufferSamples)
 	wfPointers := computeFiberWaveformPointerArray(event.FibersLG, channelMask, chPositions)
 
@@ -69,6 +73,7 @@ func ReadFiberFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeader
 			position = decodeCharge(data, position, wfPointers, chPositions, uint32(time))
 		}
 	}
+	return nil
 }
 
 func decodeChargeIndiaFiberCompressed(data []uint16, position int, waveforms []*[]int16,
@@ -114,9 +119,7 @@ func computeFiberWaveformPointerArray(waveforms map[uint16][]int16, chmask []uin
 	return wfPointers
 }
 
-func fibersChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
-	var elecID uint16
-
+func fibersChannelMask(evtFormat *EventFormat) ([]uint16, []uint16, error) {
 	channelMaskVec := make([]uint16, 0)
 	// To avoid using the map for every waveform sample we are keeping another
 	// vector with the pointers to the waveforms. This positions vector indicates
@@ -127,7 +130,10 @@ func fibersChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
 	for t = 0; t < 16; t++ {
 		active := CheckBit(evtFormat.ChannelMask, t)
 		if active {
-			elecID = computeFiberElecID(evtFormat.FecID, t, evtFormat.FWVersion)
+			elecID, err := computeFiberElecID(evtFormat.FecID, t, evtFormat.FWVersion)
+			if err != nil {
+				return nil, nil, err
+			}
 			channelMaskVec = append(channelMaskVec, elecID)
 			positions = append(positions, computeFiberPosition(elecID))
 		}
@@ -137,7 +143,7 @@ func fibersChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
 		message := fmt.Sprintf("Fiber channel mask: %v", channelMaskVec)
 		logger.Info(message, "fibers")
 	}
-	return channelMaskVec, positions
+	return channelMaskVec, positions, nil
 }
 
 func computeFiberPosition(elecID uint16) uint16 {
@@ -145,16 +151,18 @@ func computeFiberPosition(elecID uint16) uint16 {
 	return position
 }
 
-func computeFiberElecID(fecID uint16, channel uint16, fwversion uint16) uint16 {
+func computeFiberElecID(fecID uint16, channel uint16, fwversion uint16) (uint16, error) {
 	var elecID uint16
 
 	if fwversion >= 10 {
-		// Same logic as PMTs
-		elecID = channel*2 + (fecID % 2)
-		elecID += (((fecID - 2) / 4) + 1) * 100
+		base, ok := fecElecIDBase[fecID]
+		if !ok {
+			return 0, fmt.Errorf("no elecID base found for FEC %d", fecID)
+		}
+		elecID = channel*2 + (fecID % 2) + base
 	}
 
-	return elecID
+	return elecID, nil
 }
 
 func writeFiberPedestals(evtFormat *EventFormat, channelMask []uint16, baselines map[uint16]uint16) {

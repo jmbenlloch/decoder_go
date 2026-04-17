@@ -146,11 +146,14 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 				logger.Info(message, "dateReader")
 			}
 			if configuration.ReadPMTs {
-				ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
-				event.PmtConfig = PmtConfig{
-					Baselines:  evtFormat.Baseline,
-					DualMode:   evtFormat.DualModeBit,
-					ChannelsHG: evtFormat.ChannelsHG,
+				if err := ReadPmtFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event); err != nil {
+					event.Error = true
+				} else {
+					event.PmtConfig = PmtConfig{
+						Baselines:  evtFormat.Baseline,
+						DualMode:   evtFormat.DualModeBit,
+						ChannelsHG: evtFormat.ChannelsHG,
+					}
 				}
 			}
 		case 1:
@@ -175,10 +178,13 @@ func readEquipment(eventData []byte, position int, header EventHeaderStruct, eve
 				logger.Info(message, "dateReader")
 			}
 			if configuration.ReadFibers {
-				ReadFiberFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event)
-				event.FiberConfig = FiberConfig{
-					Baselines:  evtFormat.Baseline,
-					ChannelsHG: evtFormat.ChannelsHG,
+				if err := ReadFiberFEC(payload[evtFormat.HeaderSize:], &evtFormat, &header, event); err != nil {
+					event.Error = true
+				} else {
+					event.FiberConfig = FiberConfig{
+						Baselines:  evtFormat.Baseline,
+						ChannelsHG: evtFormat.ChannelsHG,
+					}
 				}
 			}
 		}

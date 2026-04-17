@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct, event *EventType) {
+func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderStruct, event *EventType) error {
 	position := 0
 	var time int = -1
 	var current_bit int = 31
@@ -24,7 +24,11 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 	var nextFT int32 = -1 //At start we don't know next FT value
 	var nextFThm int32 = -1
 
-	channelMask, chPositions := pmtsChannelMask(evtFormat)
+	channelMask, chPositions, err := pmtsChannelMask(evtFormat)
+	if err != nil {
+		logger.Error(err.Error())
+		return err
+	}
 	initializeWaveforms(event.PmtWaveforms, channelMask, bufferSamples)
 	wfPointers := computePmtWaveformPointerArray(event.PmtWaveforms, channelMask, chPositions)
 
@@ -68,6 +72,7 @@ func ReadPmtFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderSt
 			position = decodeCharge(data, position, wfPointers, chPositions, uint32(time))
 		}
 	}
+	return nil
 }
 
 func computeNextFThm(nextFT *int32, nextFThm *int32, evtFormat *EventFormat) {
@@ -150,9 +155,7 @@ func computePmtWaveformPointerArray(waveforms map[uint16][]int16, chmask []uint1
 	return wfPointers
 }
 
-func pmtsChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
-	var elecID uint16
-
+func pmtsChannelMask(evtFormat *EventFormat) ([]uint16, []uint16, error) {
 	channelMaskVec := make([]uint16, 0)
 	// To avoid using the map for every waveform sample we are keeping another
 	// vector with the pointers to the waveforms. This positions vector indicates
@@ -163,7 +166,10 @@ func pmtsChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
 	for t = 0; t < 16; t++ {
 		active := CheckBit(evtFormat.ChannelMask, t)
 		if active {
-			elecID = computePmtElecID(evtFormat.FecID, t, evtFormat.FWVersion)
+			elecID, err := computePmtElecID(evtFormat.FecID, t, evtFormat.FWVersion)
+			if err != nil {
+				return nil, nil, err
+			}
 			channelMaskVec = append(channelMaskVec, elecID)
 			positions = append(positions, computePmtPosition(elecID))
 		}
@@ -173,7 +179,7 @@ func pmtsChannelMask(evtFormat *EventFormat) ([]uint16, []uint16) {
 		message := fmt.Sprintf("Channel mask: %v", channelMaskVec)
 		logger.Info(message, "pmts")
 	}
-	return channelMaskVec, positions
+	return channelMaskVec, positions, nil
 }
 
 func computePmtPosition(elecID uint16) uint16 {
@@ -182,42 +188,18 @@ func computePmtPosition(elecID uint16) uint16 {
 	return position
 }
 
-func computePmtElecID(fecID uint16, channel uint16, fwversion uint16) uint16 {
+func computePmtElecID(fecID uint16, channel uint16, fwversion uint16) (uint16, error) {
 	var elecID uint16
 
 	if fwversion >= 10 {
-		// fec: 02: 100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122
-		// fec: 03: 101, 103, 105, 107, 109, 111, 113, 115, 117, 119, 121, 123
-		// fec: 06: 200, 202, 204, 206, 208, 210, 212, 214, 216, 218, 220, 222
-		// fec: 07: 201, 203, 205, 207, 209, 211, 213, 215, 217, 219, 221, 223
-		// fec: 10: 300, 302, 304, 306, 308, 310, 312, 314, 316, 318, 320, 322
-		// fec: 11: 301, 303, 305, 307, 309, 311, 313, 315, 317, 319, 321, 323
-		// fec: 14: 400, 402, 404, 406, 408, 410, 412, 414, 416, 418, 420, 422
-		// fec: 15: 401, 403, 405, 407, 409, 411, 413, 415, 417, 419, 421, 423
-		// fec: 18: 500, 502, 504, 506, 508, 510, 512, 514, 516, 518, 520, 522
-		// fec: 19: 501, 503, 505, 507, 509, 511, 513, 515, 517, 519, 521, 523
-		// fec: 22: 600, 602, 604, 606, 608, 610, 612, 614, 616, 618, 620, 622
-		// fec: 23: 601, 603, 605, 607, 609, 611, 613, 615, 617, 619, 621, 623
-		// fec: 26: 700, 702, 704, 706, 708, 710, 712, 714, 716, 718, 720, 722
-		// fec: 27: 701, 703, 705, 707, 709, 711, 713, 715, 717, 719, 721, 723
-
-		// Test code
-		//var fecs = []uint16{2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27}
-		//var i, j uint16
-		//for i = 0; i < 14; i++ {
-		//	for j = 0; j < 12; j++ {
-		//		fecid := fecs[i]
-		//		channel = j
-		//		elecID = channel*2 + (fecid % 2)
-		//		elecID += (((fecid - 2) / 4) + 1) * 100
-		//		fmt.Printf("fec: %d\tchannel: %d\t elecid: %d\n", fecid, channel, elecID)
-		//	}
-		//}
-		elecID = channel*2 + (fecID % 2)
-		elecID += (((fecID - 2) / 4) + 1) * 100
+		base, ok := fecElecIDBase[fecID]
+		if !ok {
+			return 0, fmt.Errorf("no elecID base found for FEC %d", fecID)
+		}
+		elecID = channel*2 + (fecID % 2) + base
 	}
 
-	return elecID
+	return elecID, nil
 }
 
 func writePmtPedestals(evtFormat *EventFormat, channelMask []uint16, baselines map[uint16]uint16) {
