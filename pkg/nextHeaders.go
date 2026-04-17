@@ -46,6 +46,7 @@ type EventFormat struct {
 	CompressedData   bool
 	Baseline         bool
 	DualModeBit      bool
+	ChannelsHG       bool
 	ErrorBit         bool
 	FWVersion        uint16
 	WordCount        uint16
@@ -86,7 +87,8 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 	position++
 
 	//Format ID L
-	FWVersion := data[position] & 0x0FFFF
+	FWVersion := data[position] & 0x07FFF
+	ChannelsHG := (data[position] & 0x08000) >> 15
 	position++
 
 	if configuration.Verbosity > 2 {
@@ -104,6 +106,8 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 		logger.Info(message, "nextHeader")
 		message = fmt.Sprintf("FW version: %d", FWVersion)
 		logger.Info(message, "nextHeader")
+		message = fmt.Sprintf("Channels HG: %d", ChannelsHG)
+		logger.Info(message, "nextHeader")
 	}
 
 	evtFormat.FecType = FecType
@@ -113,6 +117,7 @@ func readFormatID(data []uint16, position int, evtFormat *EventFormat) int {
 	evtFormat.DualModeBit = DualModeBit > 0
 	evtFormat.ErrorBit = ErrorBit > 0
 	evtFormat.FWVersion = FWVersion
+	evtFormat.ChannelsHG = ChannelsHG > 0
 
 	return position
 }

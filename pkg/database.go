@@ -10,6 +10,7 @@ import (
 var huffmanCodesPmts *HuffmanNode
 var huffmanCodesSipms *HuffmanNode
 var sensorsMap SensorsMap
+var fecElecIDBase map[uint16]uint16
 
 func LoadDatabase(dbConn *sqlx.DB, runNumber int) error {
 	var err error
@@ -28,6 +29,12 @@ func LoadDatabase(dbConn *sqlx.DB, runNumber int) error {
 	sensorsMap, err = getSensorsFromDB(dbConn, runNumber)
 	if err != nil {
 		errMessage := fmt.Errorf("error getting sensors map from database: %w", err)
+		logger.Error(errMessage.Error())
+		return errMessage
+	}
+	fecElecIDBase, err = getFecElecIDBaseFromDB(dbConn, runNumber)
+	if err != nil {
+		errMessage := fmt.Errorf("error getting FEC elecID base from database: %w", err)
 		logger.Error(errMessage.Error())
 		return errMessage
 	}
@@ -164,4 +171,37 @@ func getSensorsFromDB(db *sqlx.DB, runNumber int) (SensorsMap, error) {
 		}
 	}
 	return sensorsMap, nil
+}
+
+type FecElecIDBaseEntry struct {
+	FecID      int `db:"FecID"`
+	BaseElecID int `db:"BaseElecID"`
+}
+
+func getFecElecIDBaseFromDB(db *sqlx.DB, runNumber int) (map[uint16]uint16, error) {
+	query := fmt.Sprintf(
+		"SELECT FecID, BaseElecID FROM FecElecIDBase WHERE MinRun <= %d AND MaxRun >= %d",
+		runNumber, runNumber)
+
+	if configuration.Verbosity > 0 {
+		logger.Info("FEC elecID base read from DB", "database")
+	}
+	if configuration.Verbosity > 2 {
+		message := fmt.Sprintf("Query: %s", query)
+		logger.Info(message, "database")
+	}
+
+	rows, err := db.Queryx(query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying FecElecIDBase: %w", err)
+	}
+	result := make(map[uint16]uint16)
+	for rows.Next() {
+		entry := FecElecIDBaseEntry{}
+		if err := rows.StructScan(&entry); err != nil {
+			return nil, fmt.Errorf("error scanning FecElecIDBase row: %w", err)
+		}
+		result[uint16(entry.FecID)] = uint16(entry.BaseElecID)
+	}
+	return result, nil
 }
