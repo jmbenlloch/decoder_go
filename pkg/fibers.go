@@ -183,15 +183,16 @@ func processFiberIds(event *EventType, configuration Configuration) {
 	// Iterate over all fiber waveforms read into FibersLG
 	for elecID, waveform := range event.FibersLG {
 		// High-low gain channels
-		// Odd channels (101, 103, 105, ...) -> High Gain
+		// Odd channels (101, 103, 105, ...) -> High Gain, remapped to even elecID (100, 102, 104, ...)
 		if event.FiberConfig.ChannelsHG {
 			if elecID%2 == 1 {
-				event.FibersHG[elecID] = waveform
-				event.FiberBaselinesHG[elecID] = event.FiberBaselinesLG[elecID]
+				evenElecID := elecID - 1
+				event.FibersHG[evenElecID] = waveform
+				event.FiberBaselinesHG[evenElecID] = event.FiberBaselinesLG[elecID]
 				delete(event.FibersLG, elecID)
 				delete(event.FiberBaselinesLG, elecID)
 				if configuration.Verbosity > 2 {
-					message := fmt.Sprintf("ChannelsHG: Moved elecID %d to FibersHG", elecID)
+					message := fmt.Sprintf("ChannelsHG: Moved elecID %d to FibersHG as elecID %d", elecID, evenElecID)
 					logger.Info(message, "fibers")
 				}
 			}
