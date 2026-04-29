@@ -139,6 +139,28 @@ func sortSensorsBySensorID(sensorsFromElecIDToSensorID map[uint16]uint16) []Sens
 	return sorted
 }
 
+func sortSensorsBySensorIDForWaveforms(dbMap map[uint16]uint16, waveforms map[uint16][]int16) []SensorMappingHDF5 {
+	// The array MUST be allocated at creation, if not, HDF5 will panic
+	// doing appends will not work
+	sorted := make([]SensorMappingHDF5, len(waveforms))
+	count := 0
+	for elecID := range waveforms {
+		sensorID, exists := dbMap[elecID]
+		if !exists {
+			sensorID = uint16(0xFFFF)
+		}
+		sorted[count] = SensorMappingHDF5{
+			channel:  int32(elecID),
+			sensorID: int32(sensorID),
+		}
+		count++
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].sensorID < sorted[j].sensorID
+	})
+	return sorted
+}
+
 func sortSensorsByElecID(sensors map[uint16][]int16) []SensorMappingHDF5 {
 	// The array MUST be allocated at creation, if not, HDF5 will panic
 	// doing appends will not work
@@ -194,6 +216,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 	} else {
 		pmtSorted = sortSensorsBySensorID(sensorsMap.Pmts.ToSensorID)
 		sipmSorted = sortSensorsBySensorID(sensorsMap.Sipms.ToSensorID)
+		fiberLGSorted = sortSensorsBySensorIDForWaveforms(sensorsMap.Fibers.ToSensorID, event.FibersLG)
+		fiberHGSorted = sortSensorsBySensorIDForWaveforms(sensorsMap.Fibers.ToSensorID, event.FibersHG)
 		nPmts = len(pmtSorted)
 		nSipms = len(sipmSorted)
 		nTrgChs = nPmts
