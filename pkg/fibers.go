@@ -187,6 +187,14 @@ func processFiberIds(event *EventType, configuration Configuration) {
 		if event.FiberConfig.ChannelsHG {
 			if elecID%2 == 1 {
 				evenElecID := elecID - 1
+				// Hardware wiring bug: channels X17 and X19 have swapped HG/LG pairing
+				// X17 pairs with X18 (not X16), X19 pairs with X16 (not X18)
+				switch elecID % 100 {
+				case 17:
+					evenElecID = elecID + 1
+				case 19:
+					evenElecID = elecID - 3
+				}
 				event.FibersHG[evenElecID] = waveform
 				event.FiberBaselinesHG[evenElecID] = event.FiberBaselinesLG[elecID]
 				delete(event.FibersLG, elecID)
