@@ -172,19 +172,34 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 	}
 }
 
-// Odd words are in ptrA and even words in ptrB
+// Odd words are in ptrA and even words in ptrB.
+// The two links carry a single interleaved stream split by word parity: if
+// the total word count is odd, one link legitimately ends up with exactly
+// one more word than the other. That's a normal hardware condition, not an
+// error, so a difference of at most one word is tolerated here; the extra
+// trailing word (whichever link has it) is appended at the end.
 func buildSipmData(dataA []uint16, dataB []uint16) []uint16 {
-	size := len(dataA) + len(dataB)
-	data := make([]uint16, size)
-
-	if len(dataA) != len(dataB) {
-		errMessage := fmt.Sprintf("data from both SiPM links must have the same length: %d != %d", len(dataA), len(dataB))
+	diff := len(dataA) - len(dataB)
+	if diff < -1 || diff > 1 {
+		errMessage := fmt.Sprintf("data from both SiPM links must have the same length (or differ by at most one word): %d != %d", len(dataA), len(dataB))
 		panic(errMessage)
 	}
 
-	for i := 0; i < len(dataA); i++ {
+	minLen := len(dataA)
+	if len(dataB) < minLen {
+		minLen = len(dataB)
+	}
+	size := len(dataA) + len(dataB)
+	data := make([]uint16, size)
+
+	for i := 0; i < minLen; i++ {
 		data[i*2] = dataA[i]
 		data[i*2+1] = dataB[i]
+	}
+	if diff == 1 {
+		data[size-1] = dataA[len(dataA)-1]
+	} else if diff == -1 {
+		data[size-1] = dataB[len(dataB)-1]
 	}
 	return data
 }
