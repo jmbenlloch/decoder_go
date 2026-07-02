@@ -202,17 +202,24 @@ func flipWords(data []byte) []uint16 {
 	positionOut := 0
 
 	dataUint16 := *(*[]uint16)(unsafe.Pointer(&data))
-	dataFlipped := make([]uint16, len(data)/2) // TODO round up
+	numWords := (len(data) + 1) / 2
+	dataFlipped := make([]uint16, numWords)
 
 	for positionIn*2 < len(data) {
 		// Skip sequence counters. Size taken empirically
 		if positionIn > 0 && positionIn%3996 == 0 {
 			positionIn += 2
 		}
-		dataFlipped[positionOut] = dataUint16[positionIn+1]
-		dataFlipped[positionOut+1] = dataUint16[positionIn]
+		if positionIn+1 < numWords {
+			dataFlipped[positionOut] = dataUint16[positionIn+1]
+			dataFlipped[positionOut+1] = dataUint16[positionIn]
+			positionOut += 2
+		} else {
+			// Trailing word with no pair to swap against: copy it through as-is.
+			dataFlipped[positionOut] = dataUint16[positionIn]
+			positionOut++
+		}
 		positionIn += 2
-		positionOut += 2
 	}
 
 	return dataFlipped[:positionOut]
