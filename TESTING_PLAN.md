@@ -140,7 +140,7 @@ any refactoring or bug-fixing that could change output.
       container wrapper (with persistent Go cache; repeat runs ~1 s),
       `testmain_test.go` helper in `pkg`, HOWTO section on running tests.
       (`decoder` package needs no helper: its `init()` installs the logger.)
-- [ ] **P2 — Pure unit tests, decoding side**: `CheckBit`, `ReadTriggerFEC`,
+- [x] **P2 — Pure unit tests, decoding side**: `CheckBit`, `ReadTriggerFEC`,
       Huffman (`parse_huffman_line`, `decode_huffman`,
       `decode_compressed_value` incl. control-code escape), `ReadCommonHeader`
       and every `read*` sub-header (FormatID flags, Juliett event conf,
@@ -181,3 +181,4 @@ any refactoring or bug-fixing that could change output.
 |------|--------|------|
 | 2026-07-05 | fa4cd3c | P0: assessment and plan. |
 | 2026-07-05 | 7cab363 | P1: mage test targets, test.sh container wrapper, pkg TestMain helper, HOWTO test docs. |
+| 2026-07-05 | 6c4fb2f | P2: 30 unit tests for trigger, huffman, NEXT headers, elecID/position math, channel masks, FT computations. |
