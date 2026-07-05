@@ -37,6 +37,26 @@ func BuildDecoder() error {
 	return cmd.Run()
 }
 
+// Test runs the unit and fixture-based tests (no DB or big-data access needed).
+// Must run in an environment with CGO + libhdf5 (the duck-backend-test-base
+// container); use ./test.sh from the host.
+func Test() error {
+	return runTests(nil)
+}
+
+func runTests(extraEnv []string) error {
+	fmt.Println("Running tests...")
+	cmd := exec.Command("go", "test", "./pkg/...", "./decoder/...")
+	cmd.Env = append(os.Environ(),
+		"CGO_ENABLED=1",
+		fmt.Sprintf("CGO_LDFLAGS=%s", os.Getenv("CGO_LDFLAGS")),
+		fmt.Sprintf("CGO_CFLAGS=%s", os.Getenv("CGO_CFLAGS")))
+	cmd.Env = append(cmd.Env, extraEnv...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func BuildMeasureAlgos() error {
 	fmt.Println("Building measureAlgos executable...")
 	ldflags := os.Getenv("CGO_LDFLAGS")
