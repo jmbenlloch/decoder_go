@@ -32,14 +32,13 @@ func worker(id int, jobs <-chan WorkerData, results chan<- decoder.EventType) {
 func sendEventsToWorkers(fileReader *FileReader, jobs chan<- WorkerData) {
 	for {
 		header, eventData, err := fileReader.getNextEvent()
-		fmt.Printf("Reading event %d\n", decoder.EventIdGetNbInRun(header.EventId))
 		if err != nil {
-			fmt.Println("Error reading event:", err)
+			if err != io.EOF {
+				fmt.Println("Error reading event:", err)
+			}
 			break
 		}
-		if err == io.EOF {
-			break
-		}
+		fmt.Printf("Reading event %d\n", decoder.EventIdGetNbInRun(header.EventId))
 		jobs <- WorkerData{Data: eventData, Header: header}
 	}
 	close(jobs)

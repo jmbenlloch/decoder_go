@@ -164,11 +164,11 @@ func ReadSipmFEC(data []uint16, evtFormat *EventFormat, dateHeader *EventHeaderS
 					}
 				}
 			}
-
-			// Remove the already processed payloads from the map
-			delete(sipmPayloads, channelA)
-			delete(sipmPayloads, channelB)
 		}
+
+		// Remove the already processed payloads from the map
+		delete(sipmPayloads, channelA)
+		delete(sipmPayloads, channelB)
 	}
 }
 
