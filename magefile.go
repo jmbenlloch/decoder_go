@@ -44,6 +44,14 @@ func Test() error {
 	return runTests(nil)
 }
 
+// TestDB additionally enables the live-DB integration test, against a
+// disposable local container by default, or against an overridden target via
+// the DECODER_TEST_DB_{HOST,USER,PASS,NAME} env vars (see
+// pkg/database_test.go).
+func TestDB() error {
+	return runTests([]string{"DECODER_TEST_DB=1"})
+}
+
 func runTests(extraEnv []string) error {
 	fmt.Println("Running tests...")
 	cmd := exec.Command("go", "test", "./pkg/...", "./decoder/...")

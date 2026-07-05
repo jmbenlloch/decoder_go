@@ -108,12 +108,11 @@ confirmed) in its own commit with the test flipped to the correct expectation.
 3. **Writer/round-trip tests** (container, temp files): `NewWriter` →
    `WriteEvent` → `Close` → reopen with hdf5-go and verify groups, dataset
    shapes, mapping tables, trigger tables.
-4. **Optional integration tests** (skipped unless enabled):
-   - `DECODER_TEST_DB=1` → `database.go` against the real `HDDEMODB`.
-   - `DECODER_TEST_BIGDATA=1` → full-file decode of a real run + comparison
-     against the known-good `.h5` (golden-file regression, catches any change
-     in output semantics).
-5. **Runner**: `mage Test` (unit+fixture), `mage TestAll` (everything),
+4. **Optional integration test** (skipped unless enabled): `DECODER_TEST_DB=1`
+   → `database.go` against a live MySQL instance (a disposable local/CI
+   container by default). No external raw-data dependency: the individual
+   events any test needs are extracted and committed instead (see 2.1.2).
+5. **Runner**: `mage Test` (unit+fixture), `mage TestDB` (+ DB integration),
    `test.sh` wrapper that runs them inside the container so a single host
    command runs the suite. CI-ready.
 
@@ -136,9 +135,9 @@ Phases are ordered so that decoding logic gets locked down by tests *before*
 any refactoring or bug-fixing that could change output.
 
 - [x] **P0 — This assessment document.**
-- [x] **P1 — Infrastructure**: `mage Test` / `mage TestAll` targets, `test.sh`
-      container wrapper (with persistent Go cache; repeat runs ~1 s),
-      `testmain_test.go` helper in `pkg`, HOWTO section on running tests.
+- [x] **P1 — Infrastructure**: `mage Test` target, `test.sh` container
+      wrapper (with persistent Go cache; repeat runs ~1 s), `testmain_test.go`
+      helper in `pkg`.
       (`decoder` package needs no helper: its `init()` installs the logger.)
 - [x] **P2 — Pure unit tests, decoding side**: `CheckBit`, `ReadTriggerFEC`,
       Huffman (`parse_huffman_line`, `decode_huffman`,
@@ -170,8 +169,13 @@ any refactoring or bug-fixing that could change output.
       `ReadEventFromFile`/`ReadGDC` golden tests against known-good `.h5`
       values, unconditional (no external file or env var needed);
       `countEvents`/`getNextEvent` tests.
-- [ ] **P6 — Writer round-trip + end-to-end NoDB golden test** in container;
-      optional `DECODER_TEST_DB` / `DECODER_TEST_BIGDATA` gated tests.
+- [x] **P6 — Writer round-trip + end-to-end NoDB golden test** in container;
+      optional `DECODER_TEST_DB`-gated live-DB test, against a disposable
+      local container by default.
+      Found along the way: upstream `hdf5-go` bug — `Dataset.Close()` panics
+      for datasets returned by `OpenDataset` (nil stored datatype); production
+      code is unaffected (only closes datasets it created), test helpers work
+      around it.
 - [ ] **P7 — Bug verification & fixes** (B1–B5 above), one commit each,
       regression test included. Only after the relevant area is under test.
 - [ ] **P8 — Nice-to-have (later)**: dependency-inject globals, error returns
@@ -188,3 +192,4 @@ any refactoring or bug-fixing that could change output.
 | 2026-07-05 | cb646ec | P3: 13 tests for processPmtIds/processFiberIds (incl. X17/X19 swap), pedestal mapping, raw + compressed charge decoding. |
 | 2026-07-05 | 22b6043 | P4: writer sort/ordering, blosc JSON, LoadConfiguration, numberOfEventsToProcess tests. |
 | 2026-07-05 | 1f1381f | P5: real-data fixtures + golden ReadGDC tests (DEMO++ 15022 and HDDEMO 616 both committed), file-reader tests. |
+| 2026-07-05 | 907f80f | P6: writer round-trip (NoDB + DB), end-to-end fixture-to-HDF5 golden test, gated live-DB test against a disposable container. |
