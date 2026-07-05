@@ -134,6 +134,147 @@ func TestComputeNextFThmFW10TriggerType8(t *testing.T) {
 	}
 }
 
+func TestWritePmtPedestals(t *testing.T) {
+	evtFormat := EventFormat{
+		Baselines: []uint16{0x100, 0x101, 0x102, 0x103, 0x104, 0x105},
+	}
+	// Only 6 baselines per FEC: elecIDs 100..110 (even) map to indices 0..5,
+	// and the second dozen (112..122) reuses the same indices.
+	channelMask := []uint16{100, 102, 110, 112, 122, 301}
+	baselines := make(map[uint16]uint16)
+
+	writePmtPedestals(&evtFormat, channelMask, baselines)
+
+	want := map[uint16]uint16{
+		100: 0x100, // (0%12)/2 = 0
+		102: 0x101, // (2%12)/2 = 1
+		110: 0x105, // (10%12)/2 = 5
+		112: 0x100, // (12%12)/2 = 0
+		122: 0x105, // (22%12)/2 = 5
+		301: 0x100, // (1%12)/2 = 0
+	}
+	if !reflect.DeepEqual(baselines, want) {
+		t.Errorf("baselines = %v, want %v", baselines, want)
+	}
+}
+
+func newTestEvent() *EventType {
+	return &EventType{
+		PmtWaveforms:     make(map[uint16][]int16),
+		BlrWaveforms:     make(map[uint16][]int16),
+		SipmWaveforms:    make(map[uint16][]int16),
+		FibersLG:         make(map[uint16][]int16),
+		FibersHG:         make(map[uint16][]int16),
+		Baselines:        make(map[uint16]uint16),
+		BlrBaselines:     make(map[uint16]uint16),
+		FiberBaselinesLG: make(map[uint16]uint16),
+		FiberBaselinesHG: make(map[uint16]uint16),
+	}
+}
+
+func TestProcessPmtIdsExtTriggerAndSum(t *testing.T) {
+	event := newTestEvent()
+	event.PmtWaveforms[100] = []int16{1, 2}
+	event.PmtWaveforms[115] = []int16{3, 4} // ext trigger channel
+	event.PmtWaveforms[116] = []int16{5, 6} // pmt sum channel
+	event.Baselines[100] = 10
+	event.Baselines[115] = 20
+	event.Baselines[116] = 30
+
+	config := Configuration{ExtTrigger: 115, PmtSumCh: 116}
+	processPmtIds(event, config)
+
+	if event.ExtTrgWaveform == nil || !reflect.DeepEqual(*event.ExtTrgWaveform, []int16{3, 4}) {
+		t.Errorf("ExtTrgWaveform = %v, want [3 4]", event.ExtTrgWaveform)
+	}
+	if event.PmtSumWaveform == nil || !reflect.DeepEqual(*event.PmtSumWaveform, []int16{5, 6}) {
+		t.Errorf("PmtSumWaveform = %v, want [5 6]", event.PmtSumWaveform)
+	}
+	if event.PmtSumBaseline != 30 {
+		t.Errorf("PmtSumBaseline = %d, want 30", event.PmtSumBaseline)
+	}
+	if _, ok := event.PmtWaveforms[115]; ok {
+		t.Error("ext trigger channel still present in PmtWaveforms")
+	}
+	if _, ok := event.PmtWaveforms[116]; ok {
+		t.Error("pmt sum channel still present in PmtWaveforms")
+	}
+	if len(event.PmtWaveforms) != 1 || len(event.Baselines) != 1 {
+		t.Errorf("remaining waveforms/baselines = %d/%d, want 1/1",
+			len(event.PmtWaveforms), len(event.Baselines))
+	}
+}
+
+func TestProcessPmtIdsDualMode(t *testing.T) {
+	event := newTestEvent()
+	event.PmtConfig.DualMode = true
+	event.PmtWaveforms[100] = []int16{1}
+	event.PmtWaveforms[112] = []int16{2} // dual of 100
+	event.Baselines[100] = 10
+	event.Baselines[112] = 20
+
+	// Ext trigger / sum channels out of the way
+	processPmtIds(event, Configuration{ExtTrigger: -1, PmtSumCh: -1})
+
+	if !reflect.DeepEqual(event.BlrWaveforms[100], []int16{2}) {
+		t.Errorf("BlrWaveforms[100] = %v, want [2]", event.BlrWaveforms[100])
+	}
+	if event.BlrBaselines[100] != 20 {
+		t.Errorf("BlrBaselines[100] = %d, want 20", event.BlrBaselines[100])
+	}
+	if _, ok := event.PmtWaveforms[112]; ok {
+		t.Error("dual channel 112 still present in PmtWaveforms")
+	}
+	if !reflect.DeepEqual(event.PmtWaveforms[100], []int16{1}) {
+		t.Errorf("PmtWaveforms[100] = %v, want [1]", event.PmtWaveforms[100])
+	}
+}
+
+func TestProcessPmtIdsChannelsHG(t *testing.T) {
+	event := newTestEvent()
+	event.PmtConfig.ChannelsHG = true
+	event.PmtWaveforms[100] = []int16{1} // LG stays
+	event.PmtWaveforms[101] = []int16{2} // HG moves to BLR under same ID
+	event.Baselines[100] = 10
+	event.Baselines[101] = 20
+
+	processPmtIds(event, Configuration{ExtTrigger: -1, PmtSumCh: -1})
+
+	if !reflect.DeepEqual(event.BlrWaveforms[101], []int16{2}) {
+		t.Errorf("BlrWaveforms[101] = %v, want [2]", event.BlrWaveforms[101])
+	}
+	if event.BlrBaselines[101] != 20 {
+		t.Errorf("BlrBaselines[101] = %d, want 20", event.BlrBaselines[101])
+	}
+	if _, ok := event.PmtWaveforms[101]; ok {
+		t.Error("HG channel 101 still present in PmtWaveforms")
+	}
+}
+
+func TestDecodeChargeIndiaPmtCompressed(t *testing.T) {
+	root := testHuffmanTree(123456)
+
+	// Two channels at waveform positions 0 and 1; at time 1 the decoder uses
+	// waveform[time-1] as the prediction base.
+	wf0 := []int16{5, 0}
+	wf1 := []int16{7, 0}
+	wfPointers := []*[]int16{&wf0, &wf1}
+	chPositions := []uint16{0, 1}
+
+	// Bits: "01" (+1) for ch0, "001" (-1) for ch1 -> 01001 at bits 31..27
+	data := []uint16{0x4800, 0x0000}
+	currentBit := 31
+
+	decodeChargeIndiaPmtCompressed(data, 0, wfPointers, &currentBit, root, chPositions, 1)
+
+	if wf0[1] != 6 {
+		t.Errorf("ch0 waveform[1] = %d, want 6", wf0[1])
+	}
+	if wf1[1] != 6 {
+		t.Errorf("ch1 waveform[1] = %d, want 6", wf1[1])
+	}
+}
+
 func TestComputeNextFThmFTBit(t *testing.T) {
 	// FTBit contributes bit 16 to the initial FT value.
 	evtFormat := EventFormat{
