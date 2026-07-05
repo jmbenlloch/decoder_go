@@ -327,8 +327,8 @@ func TestWriterRoundTripDB(t *testing.T) {
 		t.Fatalf("NewWriter: %v", err)
 	}
 	event := buildWriterTestEvent(7, 0)
-	// BLR handling in DB mode is a known open issue (B2 in TESTING_PLAN.md):
-	// keep it out of this test
+	// BLR content in DB mode is covered by TestWriterRoundTripDBWithBlr;
+	// this test focuses on the non-BLR datasets
 	event.BlrWaveforms = map[uint16][]int16{}
 	event.BlrBaselines = map[uint16]uint16{}
 	writer.WriteEvent(event)
@@ -378,6 +378,66 @@ func TestWriterRoundTripDB(t *testing.T) {
 	}
 	if !reflect.DeepEqual(trgEvents, []int16{0, 1, 1}) {
 		t.Errorf("Trigger/events = %v, want [0 1 1]", trgEvents)
+	}
+}
+
+// TestWriterRoundTripDBWithBlr: in DB mode the BLR channels are the PMT
+// channels (dual-mode/HG remaps key them by the LG PMT elecID), so DataBLR
+// and the pmtblr row order must follow the PMT sensorID ordering. Regression
+// test for B2: blrSorted was never populated in the DB branch, writing an
+// empty DataBLR table and all-zero BLR waveforms.
+func TestWriterRoundTripDBWithBlr(t *testing.T) {
+	setTestConfiguration(t, Configuration{
+		NoDB:             false,
+		WriteData:        true,
+		CompressionLevel: 4,
+	})
+
+	oldMap := sensorsMap
+	t.Cleanup(func() { sensorsMap = oldMap })
+	sensorsMap = SensorsMap{
+		Pmts: SensorMapping{
+			ToSensorID: map[uint16]uint16{100: 3, 102: 2},
+			ToElecID:   map[uint16]uint16{3: 100, 2: 102},
+		},
+		Sipms:  SensorMapping{ToSensorID: map[uint16]uint16{1000: 5000, 1063: 5001}},
+		Fibers: SensorMapping{ToSensorID: map[uint16]uint16{500: 7000}},
+	}
+
+	path := filepath.Join(t.TempDir(), "db_blr.h5")
+	writer, err := NewWriter(path)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+	writer.WriteEvent(buildWriterTestEvent(7, 0))
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	f := openForRead(t, path)
+
+	// BLR mapping mirrors the PMT mapping (sensorID order)
+	blrMap := readTableRows[SensorMappingHDF5](t, f, "/Sensors/DataBLR")
+	wantMap := []SensorMappingHDF5{{102, 2}, {100, 3}}
+	if !reflect.DeepEqual(blrMap, wantMap) {
+		t.Errorf("DataBLR = %v, want %v", blrMap, wantMap)
+	}
+
+	// Waveforms follow the same order: row 0 = elecID 102 BLR data
+	blrData, blrDims := readInt16Dataset(t, f, "/RD/pmtblr")
+	if !reflect.DeepEqual(blrDims, []uint{1, 2, 16}) {
+		t.Fatalf("pmtblr dims = %v, want [1 2 16]", blrDims)
+	}
+	if !reflect.DeepEqual(blrData[0:16], rampWaveform(300, 16)) {
+		t.Errorf("blr row 0 = %v, want elecID 102 BLR data (ramp from 300)", blrData[0:16])
+	}
+	if !reflect.DeepEqual(blrData[16:32], rampWaveform(200, 16)) {
+		t.Errorf("blr row 1 = %v, want elecID 100 BLR data (ramp from 200)", blrData[16:32])
+	}
+
+	blrBase, _ := readInt16Dataset(t, f, "/RD/blr_baselines")
+	if !reflect.DeepEqual(blrBase, []int16{3030, 3020}) {
+		t.Errorf("blr_baselines = %v, want [3030 3020]", blrBase)
 	}
 }
 

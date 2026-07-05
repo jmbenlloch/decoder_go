@@ -239,6 +239,9 @@ func (w *Writer) WriteEvent(event *EventType) {
 		nTrgChs = len(buildSortedElecIDs(event.PmtWaveforms, event.FibersLG))
 	} else {
 		pmtSorted = sortSensorsBySensorID(sensorsMap.Pmts.ToSensorID)
+		// BLR channels are the PMT channels (dual-mode/HG waveforms are
+		// keyed by the LG PMT elecID), so they share the PMT ordering
+		blrSorted = pmtSorted
 		sipmSorted = sortSensorsBySensorID(sensorsMap.Sipms.ToSensorID)
 		fiberLGSorted = sortSensorsBySensorIDForWaveforms(sensorsMap.Fibers.ToSensorID, event.FibersLG)
 		fiberHGSorted = sortSensorsBySensorIDForWaveforms(sensorsMap.Fibers.ToSensorID, event.FibersHG)
@@ -308,8 +311,8 @@ func (w *Writer) WriteEvent(event *EventType) {
 		}
 
 		if len(event.BlrWaveforms) > 0 {
-			w.BlrWaveforms = create3dArray(w.RDGroup, "pmtblr", nPmts, pmtSamples)
-			w.BlrBaselines = create2dArray(w.RDGroup, "blr_baselines", nPmts)
+			w.BlrWaveforms = create3dArray(w.RDGroup, "pmtblr", len(blrSorted), pmtSamples)
+			w.BlrBaselines = create2dArray(w.RDGroup, "blr_baselines", len(blrSorted))
 			w.BlrMappingTable, _ = createTable(w.SensorsGroup, "DataBLR", SensorMappingHDF5{})
 			writeArrayToTable(w.BlrMappingTable, &blrSorted, w.EvtCounter)
 		}
@@ -339,12 +342,11 @@ func (w *Writer) WriteEvent(event *EventType) {
 		writeBaselines(w.Baselines, event.Baselines, pmtSorted, w.EvtCounter, nPmts)
 	}
 	if nBlrs > 0 {
-		// This uses the same channel order as the PMTs
-		// it works well when reading the channel map from DB
-		// in no-DB mode, if there is a dual channel of a missing normal channel,
-		// it will not be written.
-		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, blrSorted, w.EvtCounter, nBlrs, pmtSamples)
-		writeBaselines(w.BlrBaselines, event.BlrBaselines, pmtSorted, w.EvtCounter, nPmts)
+		// In DB mode blrSorted is the PMT ordering; in no-DB mode it is the
+		// elecID ordering of the BLR channels actually present. Waveforms
+		// and baselines must use the same order and row count.
+		writeWaveforms(w.BlrWaveforms, event.BlrWaveforms, blrSorted, w.EvtCounter, len(blrSorted), pmtSamples)
+		writeBaselines(w.BlrBaselines, event.BlrBaselines, blrSorted, w.EvtCounter, len(blrSorted))
 	}
 	if nSipms > 0 {
 		writeWaveforms(w.SipmWaveforms, event.SipmWaveforms, sipmSorted, w.EvtCounter, nSipms, sipmSamples)
