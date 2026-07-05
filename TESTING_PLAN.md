@@ -163,11 +163,13 @@ any refactoring or bug-fixing that could change output.
       temp-file datasets), `BloscAlgorithm`/`BloscShuffle` JSON round-trip,
       `convertToHdf5String`, `LoadConfiguration` defaults + overrides,
       `numberOfEventsToProcess`.
-- [ ] **P5 — Fixtures + real-data tests**: extraction tool
-      (`cmd or script writing pkg/testdata/*.bin`), DB snapshot to JSON for the
-      fixture runs, `ReadEvent`/`ReadGDC` tests asserting decoded waveforms
-      against known-good `.h5` values; `countEvents`/`getNextEvent`
-      (skip/max_events) tests on a small fixture file.
+- [x] **P5 — Fixtures + real-data tests**: `scripts/extract_rd_events.py` +
+      `scripts/dump_db_fixture.sh`; committed fixtures for DEMO++ run 15022
+      (2 events, PMTs+SiPMs compressed) and HDDEMO run 616 (2 events,
+      fibers+SiPMs raw mode) with DB snapshots for both runs;
+      `ReadEventFromFile`/`ReadGDC` golden tests against known-good `.h5`
+      values, unconditional (no external file or env var needed);
+      `countEvents`/`getNextEvent` tests.
 - [ ] **P6 — Writer round-trip + end-to-end NoDB golden test** in container;
       optional `DECODER_TEST_DB` / `DECODER_TEST_BIGDATA` gated tests.
 - [ ] **P7 — Bug verification & fixes** (B1–B5 above), one commit each,
@@ -185,3 +187,4 @@ any refactoring or bug-fixing that could change output.
 | 2026-07-05 | 6c4fb2f | P2: 30 unit tests for trigger, huffman, NEXT headers, elecID/position math, channel masks, FT computations. |
 | 2026-07-05 | cb646ec | P3: 13 tests for processPmtIds/processFiberIds (incl. X17/X19 swap), pedestal mapping, raw + compressed charge decoding. |
 | 2026-07-05 | 22b6043 | P4: writer sort/ordering, blosc JSON, LoadConfiguration, numberOfEventsToProcess tests. |
+| 2026-07-05 | 1f1381f | P5: real-data fixtures + golden ReadGDC tests (DEMO++ 15022 and HDDEMO 616 both committed), file-reader tests. |
