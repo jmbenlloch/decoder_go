@@ -107,6 +107,12 @@ func TestNumberOfEventsToProcess(t *testing.T) {
 		{"max above file count", 5, 0, 10, 5},
 		{"skip reduces count", 100, 3, 10, 7},
 		{"exact", 10, 0, 10, 10},
+		// The reader delivers min(maxEvents, fileEvts) - skip events; the
+		// old formula returned fileEvts here (97 and 1 are what actually
+		// arrive), making processWorkerResults wait forever in parallel mode.
+		{"skip with unlimited max", 100, 3, 1000000000, 97},
+		{"skip with small file", 2, 1, 1000000000, 1},
+		{"skip beyond file", 5, 10, 1000000000, 0},
 	}
 	for _, c := range cases {
 		if got := numberOfEventsToProcess(c.fileEvts, c.skip, c.maxEvts); got != c.want {

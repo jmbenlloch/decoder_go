@@ -160,10 +160,19 @@ func processEvent(eventData []byte, header decoder.EventHeaderStruct, writer *de
 	decoder.ProcessDecodedEvent(event, configuration, writer, writer2)
 }
 
+// The file reader stops after maxEvtCount valid events (counting skipped
+// ones) and drops the first skipEvts, so the number of events actually
+// delivered is min(maxEvtCount, fileEvtCount) - skipEvts. This count drives
+// the parallel-mode result loop: overestimating it makes
+// processWorkerResults wait for results that never arrive.
 func numberOfEventsToProcess(fileEvtCount int, skipEvts int, maxEvtCount int) int {
-	evtsToRead := maxEvtCount - skipEvts
+	evtsToRead := maxEvtCount
 	if evtsToRead > fileEvtCount {
 		evtsToRead = fileEvtCount
+	}
+	evtsToRead -= skipEvts
+	if evtsToRead < 0 {
+		evtsToRead = 0
 	}
 	return evtsToRead
 }
