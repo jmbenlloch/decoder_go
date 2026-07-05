@@ -155,7 +155,8 @@ any refactoring or bug-fixing that could change output.
       `writeFiberPedestals`, `decodeCharge` (4-channel 12-bit packing),
       `decodeChargeIndiaSipmCompressed`/`...PmtCompressed` with a synthetic
       Huffman tree, `initializeWaveforms`.
-- [ ] **P4 — Writer + config unit tests**: `sortSensorsBySensorID`,
+- [x] **P4 — Writer + config unit tests** (pure parts; the hdf5-backed
+      trigger-channel writers moved to P6): `sortSensorsBySensorID`,
       `sortSensorsByElecID`, `sortSensorsBySensorIDForWaveforms` (0xFFFF
       fallback), `buildSortedElecIDs`/`buildSortedSensorIDs`,
       `writeTriggerChannels`/`writeTriggerChannelsNoDB` ordering (via real
@@ -183,3 +184,4 @@ any refactoring or bug-fixing that could change output.
 | 2026-07-05 | 7cab363 | P1: mage test targets, test.sh container wrapper, pkg TestMain helper, HOWTO test docs. |
 | 2026-07-05 | 6c4fb2f | P2: 30 unit tests for trigger, huffman, NEXT headers, elecID/position math, channel masks, FT computations. |
 | 2026-07-05 | cb646ec | P3: 13 tests for processPmtIds/processFiberIds (incl. X17/X19 swap), pedestal mapping, raw + compressed charge decoding. |
+| 2026-07-05 | 22b6043 | P4: writer sort/ordering, blosc JSON, LoadConfiguration, numberOfEventsToProcess tests. |
