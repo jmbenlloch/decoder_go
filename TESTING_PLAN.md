@@ -149,7 +149,7 @@ any refactoring or bug-fixing that could change output.
       `computeSipmPosition/IDFromPosition`, `sipmChannelMask`,
       `pmtsChannelMask`/`fibersChannelMask` (incl. missing-FEC error),
       `computeNextFThm`, `computeSipmTime` (ZS ring-buffer wrap).
-- [ ] **P3 — Pure unit tests, event post-processing**: `processPmtIds`
+- [x] **P3 — Pure unit tests, event post-processing**: `processPmtIds`
       (ext-trigger, PMT-sum, dual-mode remap, HG/LG), `processFiberIds`
       (HG remap incl. X17/X19 hardware swap), `writePmtPedestals`/
       `writeFiberPedestals`, `decodeCharge` (4-channel 12-bit packing),
@@ -182,3 +182,4 @@ any refactoring or bug-fixing that could change output.
 | 2026-07-05 | fa4cd3c | P0: assessment and plan. |
 | 2026-07-05 | 7cab363 | P1: mage test targets, test.sh container wrapper, pkg TestMain helper, HOWTO test docs. |
 | 2026-07-05 | 6c4fb2f | P2: 30 unit tests for trigger, huffman, NEXT headers, elecID/position math, channel masks, FT computations. |
+| 2026-07-05 | cb646ec | P3: 13 tests for processPmtIds/processFiberIds (incl. X17/X19 swap), pedestal mapping, raw + compressed charge decoding. |
