@@ -136,9 +136,10 @@ Phases are ordered so that decoding logic gets locked down by tests *before*
 any refactoring or bug-fixing that could change output.
 
 - [x] **P0 — This assessment document.**
-- [ ] **P1 — Infrastructure**: `mage Test` / `mage TestAll` targets, `test.sh`
-      container wrapper, `testmain_test.go` helpers in `pkg` and `decoder`,
-      HOWTO section on running tests.
+- [x] **P1 — Infrastructure**: `mage Test` / `mage TestAll` targets, `test.sh`
+      container wrapper (with persistent Go cache; repeat runs ~1 s),
+      `testmain_test.go` helper in `pkg`, HOWTO section on running tests.
+      (`decoder` package needs no helper: its `init()` installs the logger.)
 - [ ] **P2 — Pure unit tests, decoding side**: `CheckBit`, `ReadTriggerFEC`,
       Huffman (`parse_huffman_line`, `decode_huffman`,
       `decode_compressed_value` incl. control-code escape), `ReadCommonHeader`
@@ -178,4 +179,5 @@ any refactoring or bug-fixing that could change output.
 
 | Date | Commit | What |
 |------|--------|------|
-| 2026-07-05 | (this commit) | P0: assessment and plan. |
+| 2026-07-05 | fa4cd3c | P0: assessment and plan. |
+| 2026-07-05 | 7cab363 | P1: mage test targets, test.sh container wrapper, pkg TestMain helper, HOWTO test docs. |
