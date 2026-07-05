@@ -75,16 +75,19 @@ It is updated as work progresses; each item links to the commit that closed it.
 
 ### 1.4 Suspected defects found while reading the code (to verify with tests)
 
-| # | Location | Suspicion |
-|---|----------|-----------|
-| B1 | `pkg/nextHeaders.go:38` `readSeqCounter` | `(uint32(data[position+1]) & 0xffff) + (uint32(data[position+1]) << 16)` uses word `position+1` twice; `data[position]` is never read. Sequence counter is wrong whenever the two words differ; the `sequenceCounter == 0` gate works only by accident. |
-| B2 | `pkg/writer.go` `WriteEvent` | In DB mode (`no_db: false`) `blrSorted` is never populated (only in the NoDB branch), yet it is used as the channel order for `writeWaveforms(w.BlrWaveforms, ...)` and for the `DataBLR` mapping table → BLR waveforms would be written as all-zeros with an empty mapping whenever dual-mode PMT data is decoded in DB mode. Also `writeBaselines(w.BlrBaselines, ..., pmtSorted, ..., nPmts)` mixes PMT ordering with BLR data. |
-| B3 | `decoder/main.go` `numberOfEventsToProcess` + parallel mode | `evtsToRead = maxEvents - skip`, capped by total file events, but the reader delivers at most `min(maxEvents, fileEvtCount) - skip` events. With `skip > 0` and large `max_events`, `processWorkerResults` waits for more results than will ever arrive → deadlock (hang) in `parallel: true` mode. |
-| B4 | `decoder/workers.go` `sendEventsToWorkers` | `err == io.EOF` branch is dead code (first `err != nil` breaks); harmless but masks intent. Worker error events are sent with `Error: true` but `processWorkerResults` still counts them against `evtsToRead` — inconsistent with serial mode counting. |
-| B5 | `pkg/sipms.go` `ReadSipmFEC` | `delete(sipmPayloads, ...)` executes inside the per-time-bin loop instead of once after decoding; harmless today (idempotent) but fragile. |
+All five were confirmed and fixed (each with a regression test, own commit):
 
-Each of these gets: a test that demonstrates current behaviour, then a fix (if
-confirmed) in its own commit with the test flipped to the correct expectation.
+| # | Location | Defect | Status |
+|---|----------|--------|--------|
+| B1 | `pkg/nextHeaders.go` `readSeqCounter` | Read `data[position+1]` twice, never `data[position]`: continuation fragments with only the high counter half set were parsed as fresh headers. | **Fixed** `acca5e2` |
+| B2 | `pkg/writer.go` `WriteEvent` | DB mode never populated `blrSorted`: `DataBLR` written empty and `pmtblr` all zeros whenever dual-mode/HG PMT data was decoded with a DB; BLR baselines also used a different ordering than BLR waveforms. DB mode now reuses the PMT sensorID ordering; waveforms/baselines share order and row count. | **Fixed** `bed500b` |
+| B3 | `decoder/main.go` `numberOfEventsToProcess` | Subtracted `skip` before capping at the file event count: with `skip > 0` and large `max_events` the parallel-mode result loop waited for events that never arrive (hang). | **Fixed** `f94d49e` |
+| B4 | `decoder/workers.go` `sendEventsToWorkers` | Dead `err == io.EOF` branch; per-event print ran on failed reads. | **Fixed** `15448b6` |
+| B5 | `pkg/sipms.go` `ReadSipmFEC` | Processed-payload deletes ran on every time bin instead of once per FEC pair. | **Fixed** `15448b6` |
+
+After all fixes, the rebuilt decoder binary reproduces the pre-change
+known-good `run_616_db.h5` byte-for-byte (all datasets compared equal),
+confirming no unintended behaviour change on the normal decoding path.
 
 ---
 
@@ -176,8 +179,9 @@ any refactoring or bug-fixing that could change output.
       for datasets returned by `OpenDataset` (nil stored datatype); production
       code is unaffected (only closes datasets it created), test helpers work
       around it.
-- [ ] **P7 — Bug verification & fixes** (B1–B5 above), one commit each,
-      regression test included. Only after the relevant area is under test.
+- [x] **P7 — Bug verification & fixes** (B1–B5 above), one commit each,
+      regression test included; production output verified unchanged against
+      the known-good run 616 DB-mode file.
 - [ ] **P8 — Nice-to-have (later)**: dependency-inject globals, error returns
       instead of logged-and-ignored hdf5 errors, CI workflow, coverage target
       (aim: >70% of `pkg`).
@@ -192,4 +196,8 @@ any refactoring or bug-fixing that could change output.
 | 2026-07-05 | cb646ec | P3: 13 tests for processPmtIds/processFiberIds (incl. X17/X19 swap), pedestal mapping, raw + compressed charge decoding. |
 | 2026-07-05 | 22b6043 | P4: writer sort/ordering, blosc JSON, LoadConfiguration, numberOfEventsToProcess tests. |
 | 2026-07-05 | 1f1381f | P5: real-data fixtures + golden ReadGDC tests (DEMO++ 15022 and HDDEMO 616 both committed), file-reader tests. |
-| 2026-07-05 | 907f80f | P6: writer round-trip (NoDB + DB), end-to-end fixture-to-HDF5 golden test, gated live-DB test against a disposable container. |
+| 2026-07-05 | d2b0b8e | P6: writer round-trip (NoDB + DB), end-to-end fixture-to-HDF5 golden test, gated live-DB test against a disposable container. |
+| 2026-07-05 | 50347ef | B1 fix: readSeqCounter read the same word twice. |
+| 2026-07-05 | 378d9e9 | B2 fix: DB-mode BLR waveforms written with empty channel ordering. |
+| 2026-07-05 | c446a52 | B3 fix: parallel-mode hang when skip > 0 with large max_events. |
+| 2026-07-05 | db9d337 | B4+B5 cleanups: dead EOF branch, per-time-bin payload deletes. Binary output verified byte-identical to known-good run_616_db.h5. |
