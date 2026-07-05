@@ -155,6 +155,26 @@ func TestReadCommonHeaderNonZeroSeqCounter(t *testing.T) {
 	}
 }
 
+// The 32-bit sequence counter spans both first words (after flipWords the
+// high half is word 0, the low half word 1). A fragment whose counter has
+// only the high half set is still a continuation fragment and must not be
+// parsed as a fresh header. Regression test for the readSeqCounter bug that
+// read data[position+1] twice and ignored word 0 entirely.
+func TestReadCommonHeaderSeqCounterHighWord(t *testing.T) {
+	data := buildFW10Header()
+	data[0] = 0x0001 // high half of the counter
+	data[1] = 0x0000 // low half zero
+
+	evt := ReadCommonHeader(data)
+
+	if evt.HeaderSize != 2 {
+		t.Errorf("HeaderSize = %d, want 2 (continuation fragment)", evt.HeaderSize)
+	}
+	if evt.FWVersion != 0 {
+		t.Errorf("continuation fragment was parsed: FWVersion = %d, want 0", evt.FWVersion)
+	}
+}
+
 func TestEventIdGetNbInRun(t *testing.T) {
 	if got := EventIdGetNbInRun(EventIdType{42, 7}); got != 42 {
 		t.Errorf("EventIdGetNbInRun = %d, want 42", got)

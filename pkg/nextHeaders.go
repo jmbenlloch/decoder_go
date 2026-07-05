@@ -35,7 +35,9 @@ func ReadCommonHeader(data []uint16) EventFormat {
 }
 
 func readSeqCounter(data []uint16, position int) (uint32, int) {
-	sequenceCounter := (uint32(data[position+1]) & 0x0ffff) + (uint32(data[position+1]) << 16)
+	// After flipWords the 32-bit counter has its high half in word 0 and
+	// its low half in word 1
+	sequenceCounter := (uint32(data[position+1]) & 0x0ffff) + (uint32(data[position]) << 16)
 	position += 2
 	return sequenceCounter, position
 }
