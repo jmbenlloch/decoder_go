@@ -22,7 +22,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: ci_test_password
+          MYSQL_ROOT_PASSWORD: decoder_test_password
           MYSQL_DATABASE: HDDEMODB
         options: >-
           --health-cmd="mysqladmin ping -h localhost"
@@ -32,7 +32,7 @@ jobs:
     env:
       DECODER_TEST_DB_HOST: mysql
       DECODER_TEST_DB_USER: root
-      DECODER_TEST_DB_PASS: ci_test_password
+      DECODER_TEST_DB_PASS: decoder_test_password
       DECODER_TEST_DB_NAME: HDDEMODB
     steps:
       - uses: actions/checkout@v4
