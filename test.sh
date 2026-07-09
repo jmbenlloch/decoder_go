@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
-# Run the decoder test suite inside the duck-backend-test-base container,
-# which provides Go + CGO + libhdf5. Run from the host:
+# Run the decoder test suite inside the nextmgmt/next-decoder container,
+# which provides Go + CGO + libhdf5. Pulls the image if not already present
+# locally. Run from the host:
 #
 #   ./test.sh                 # unit + fixture tests (mage test)
 #   ./test.sh db              # + live DB integration test (mage testdb)
 #   ./test.sh go <args...>    # arbitrary 'go' invocation, e.g. ./test.sh go test -run Huffman ./pkg/...
 #
 # DECODER_TEST_DB_{HOST,USER,PASS,NAME} override where the DB test connects
-# (default: a local disposable container); see pkg/database_test.go.
+# (default: a local disposable container); used by CI to point at the mysql
+# service container instead. See pkg/testdata/hddemo_616_seed.sql.
 set -euo pipefail
 
 DECODER_DIR="$(cd "$(dirname "$0")" && pwd)"
-IMAGE="${IMAGE:-duck-backend-test-base:latest}"
+IMAGE="${IMAGE:-nextmgmt/next-decoder:latest}"
 # Persistent module/build cache so repeated runs do not re-download deps
 CACHE_DIR="${CACHE_DIR:-$HOME/.cache/decoder_go_container}"
 mkdir -p "$CACHE_DIR/gopath" "$CACHE_DIR/gocache"
+
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "Image $IMAGE not found locally, pulling..."
+    docker pull "$IMAGE"
+fi
 
 case "${1:-test}" in
     db)   cmd=(mage testdb) ;;

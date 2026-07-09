@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit and fixture tests
+        run: ./test.sh
+
+  test-db:
+    runs-on: ubuntu-latest
+    container:
+      image: nextmgmt/next-decoder:latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_test_password
+          MYSQL_DATABASE: HDDEMODB
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+    env:
+      DECODER_TEST_DB_HOST: mysql
+      DECODER_TEST_DB_USER: root
+      DECODER_TEST_DB_PASS: ci_test_password
+      DECODER_TEST_DB_NAME: HDDEMODB
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Allow git operations in the checked-out worktree
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install MySQL client
+        run: apt-get update -qq && apt-get install -y -qq default-mysql-client
+
+      - name: Seed test database
+        run: mysql -h mysql -uroot -p"$DECODER_TEST_DB_PASS" HDDEMODB < pkg/testdata/hddemo_616_seed.sql
+
+      - name: Run DB integration test
+        run: mage testdb

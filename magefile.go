@@ -38,7 +38,7 @@ func BuildDecoder() error {
 }
 
 // Test runs the unit and fixture-based tests (no DB or big-data access needed).
-// Must run in an environment with CGO + libhdf5 (the duck-backend-test-base
+// Must run in an environment with CGO + libhdf5 (the nextmgmt/next-decoder
 // container); use ./test.sh from the host.
 func Test() error {
 	return runTests(nil)
@@ -47,7 +47,7 @@ func Test() error {
 // TestDB additionally enables the live-DB integration test, against a
 // disposable local container by default, or against an overridden target via
 // the DECODER_TEST_DB_{HOST,USER,PASS,NAME} env vars (see
-// pkg/database_test.go).
+// pkg/database_test.go and pkg/testdata/hddemo_616_seed.sql).
 func TestDB() error {
 	return runTests([]string{"DECODER_TEST_DB=1"})
 }
